@@ -1,0 +1,10 @@
+build/bin
+node_modules
+frontend/dist
+
+.vscode/**
+
+# Ignore Emacs stuff
+*~
+\#*\#
+.\#*
