@@ -1,0 +1,137 @@
+package request
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/megakuul/voiper/internal/sip/uri"
+)
+
+const (
+	SPLIT = "\r\n"
+)
+
+type METHOD string
+
+const (
+	REGISTER  METHOD = "REGISTER"
+	OPTIONS   METHOD = "OPTIONS"
+	INVITE    METHOD = "INVITE"
+	ACK       METHOD = "ACK"
+	BYE       METHOD = "BYE"
+	PRACK     METHOD = "PRACK"
+	SUBSCRIBE METHOD = "SUBSCRIBE"
+	NOTIFY    METHOD = "NOTIFY"
+	PUBLISH   METHOD = "PUBLISH"
+	INFO      METHOD = "INFO"
+	UPDATE    METHOD = "UPDATE"
+	MESSAGE   METHOD = "MESSAGE"
+	REFER     METHOD = "REFER"
+)
+
+var methods map[string]METHOD = map[string]METHOD{
+	"REGISTER":  REGISTER,
+	"OPTIONS":   OPTIONS,
+	"INVITE":    INVITE,
+	"ACK":       ACK,
+	"BYE":       BYE,
+	"PRACK":     PRACK,
+	"SUBSCRIBE": SUBSCRIBE,
+	"NOTIFY":    NOTIFY,
+	"PUBLISH":   PUBLISH,
+	"INFO":      INFO,
+	"UPDATE":    UPDATE,
+	"MESSAGE":   MESSAGE,
+	"REFER":     REFER,
+}
+
+type STATUS int
+
+const (
+	TRYING                  STATUS = 100
+	RINGING                 STATUS = 180
+	CALL_IS_BEING_FORWARDED STATUS = 181
+	QUEUED                  STATUS = 182
+	SESSION_PROGRESS        STATUS = 183
+
+	OK       STATUS = 200
+	ACCEPTED STATUS = 202
+
+	MULTIPLE_CHOICES    STATUS = 300
+	MOVED_PERMANENTLY   STATUS = 301
+	MOVED_TEMPORARILY   STATUS = 302
+	USE_PROXY           STATUS = 305
+	ALTERNATIVE_SERVICE STATUS = 380 // "hey guys, I was thinking... lets add unnecessary complexity to the protocol"
+
+	BAD_REQUEST                   STATUS = 400
+	UNAUTHORIZED                  STATUS = 401
+	FORBIDDEN                     STATUS = 403
+	NOT_FOUND                     STATUS = 404
+	PROXY_AUTHENTICATION_REQUIRED STATUS = 407
+	REQUEST_TIMEOUT               STATUS = 408
+	GONE                          STATUS = 410
+	UNSUPPORTED_MEDIA_TYPE        STATUS = 415
+	TEMPORARILY_UNAVAILABLE       STATUS = 480
+	BUSY_HERE                     STATUS = 486
+	REQUEST_TERMINATED            STATUS = 487
+
+	INTERNAL_SERVER_ERROR STATUS = 500
+	NOT_IMPLEMENTED       STATUS = 501
+	BAD_GATEWAY           STATUS = 502
+	SERVER_UNAVAILABLE    STATUS = 503
+	SERVER_TIMEOUT        STATUS = 504
+
+	BUSY_EVERYWHERE         STATUS = 600
+	DECLINE                 STATUS = 603
+	DOES_NOT_EXIST_ANYWHERE STATUS = 604
+	NOT_ACCEPTABLE          STATUS = 606
+)
+
+type CONTENT_TYPE int
+
+const (
+	APPLICATION_SDP CONTENT_TYPE = iota
+	APPLICATION_PIDF_XML
+	MESSAGE_SIPFRAG
+)
+
+var contents map[string]CONTENT_TYPE = map[string]CONTENT_TYPE{
+	"application/sdp":      APPLICATION_SDP,
+	"application/pidf+xml": APPLICATION_PIDF_XML,
+	"message/sipfrag":      MESSAGE_SIPFRAG,
+}
+
+type Request struct {
+	Method  METHOD
+	URI     uri.URI
+	Version string
+	Headers map[string]string
+	Body    Body
+}
+
+func SerializeRequest(request *Request) string {
+	b := strings.Builder{}
+
+	b.WriteString(string(request.Method))
+	b.WriteString(" ")
+	b.WriteString(uri.Serialize(&request.URI))
+	b.WriteString(" ")
+	b.WriteString(request.Version)
+	b.WriteString(SPLIT)
+
+	request.Headers["content-type"] = request.Body.Type()
+	request.Headers["content-length"] = strconv.Itoa(request.Body.Length())
+
+	for key, value := range request.Headers {
+		b.WriteString(key)
+		b.WriteString(": ")
+		b.WriteString(value)
+		b.WriteString(SPLIT)
+	}
+
+	b.WriteString(SPLIT)
+
+	b.WriteString(request.Body.Content())
+
+	return b.String()
+}
