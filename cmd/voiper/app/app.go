@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -19,8 +19,23 @@ type App struct {
 	config     *config.Config
 }
 
-func NewApp() *App {
-	return &App{}
+type AppOption func(*App)
+
+func NewApp(opts ...AppOption) *App {
+	app := &App{}
+
+	for _, opt := range opts {
+		opt(app)
+	}
+
+	return app
+}
+
+// WithBase adds a base path to the application (used to lookup configs etc).
+func WithBase(path string) AppOption {
+	return func(a *App) {
+		a.basePath = path
+	}
 }
 
 // startup is called when the app starts. The context is saved

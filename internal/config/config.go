@@ -24,7 +24,7 @@ const (
 
 type Config struct {
 	Server      string `toml:"server"`
-	Port        string `toml:"port"`
+	Port        int    `toml:"port"`
 	Username    string `toml:"username"`
 	Password    string `toml:"password"`
 	DisplayName string `toml:"display_name"`
@@ -40,13 +40,20 @@ func ListConfigs(basePath string) (map[string]bool, error) {
 
 	configs := map[string]bool{}
 	for _, entry := range entries {
+		path, err := filepath.Abs(
+			filepath.Join(basePath, entry.Name()),
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		if strings.HasSuffix(entry.Name(), CONFIG_EXTENSION+SECURE_EXTENSION) {
 			configs[strings.TrimSuffix(
-				filepath.Join(basePath, entry.Name()), CONFIG_EXTENSION+SECURE_EXTENSION,
+				path, CONFIG_EXTENSION+SECURE_EXTENSION,
 			)] = true
 		} else if strings.HasSuffix(entry.Name(), CONFIG_EXTENSION) {
 			configs[strings.TrimSuffix(
-				filepath.Join(basePath, entry.Name()), CONFIG_EXTENSION,
+				path, CONFIG_EXTENSION,
 			)] = false
 		}
 	}
