@@ -1,6 +1,6 @@
 <script>
   import logo from './assets/images/logo-universal.png'
-  import {ListConfigs, RegisterSIP} from '../wailsjs/go/app/App.js'
+  import {EnableConfig, ListConfigs, RegisterSIP} from '../wailsjs/go/app/App.js'
 
   /** @type {string} */
   let Exception = $state(undefined);
@@ -25,6 +25,14 @@
       Exception = err
     }
   }
+
+  async function enable(name) {
+    try {
+      await EnableConfig(name, "")
+    } catch (err) {
+      Exception = err
+    }
+  }
 </script>
 
 <main>
@@ -33,7 +41,7 @@
     <button class="btn" onclick={list}>List</button>
   <div class="flex flex-col items-center">
     {#each Object.entries(Configs) as [path, encrypted]}
-      <div class="w-1/2 bg-slate-500">{path} {encrypted}</div>
+      <button class="w-1/2 bg-slate-500" onclick={() => enable(path)}>{path} {encrypted}</button>
     {/each}
   </div>
 

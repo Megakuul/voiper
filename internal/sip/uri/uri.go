@@ -13,7 +13,7 @@ type URI struct {
 	Secure bool
 	User   string
 	Host   string
-	params map[string]string
+	Param  map[string]string
 }
 
 // Serializes a sip uri (RFC 3261.19.1).
@@ -29,7 +29,7 @@ func Serialize(uri *URI) string {
 	b.WriteString("@")
 	b.WriteString(uri.Host)
 
-	for key, value := range uri.params {
+	for key, value := range uri.Param {
 		b.WriteString(";")
 		b.WriteString(key)
 		b.WriteString("=")
@@ -45,7 +45,7 @@ func Parse(str string) (*URI, error) {
 	// it should be rewriten without the simple but slow string functions like SplitN().
 
 	uri := &URI{
-		params: map[string]string{},
+		Param: map[string]string{},
 	}
 
 	blocks := strings.SplitN(str, "@", 2)
@@ -85,7 +85,7 @@ func Parse(str string) (*URI, error) {
 			)
 		}
 
-		uri.params[kv[0]] = kv[1]
+		uri.Param[kv[0]] = kv[1]
 	}
 
 	return uri, nil

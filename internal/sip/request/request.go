@@ -105,7 +105,7 @@ type Request struct {
 	Method  METHOD
 	URI     uri.URI
 	Version string
-	Headers map[string]string
+	Headers map[string][]string
 	Body    Body
 }
 
@@ -119,14 +119,16 @@ func SerializeRequest(request *Request) string {
 	b.WriteString(request.Version)
 	b.WriteString(SPLIT)
 
-	request.Headers["content-type"] = request.Body.Type()
-	request.Headers["content-length"] = strconv.Itoa(request.Body.Length())
+	request.Headers["content-type"] = []string{request.Body.Type()}
+	request.Headers["content-length"] = []string{strconv.Itoa(request.Body.Length())}
 
-	for key, value := range request.Headers {
-		b.WriteString(key)
-		b.WriteString(": ")
-		b.WriteString(value)
-		b.WriteString(SPLIT)
+	for key, values := range request.Headers {
+		for _, value := range values {
+			b.WriteString(key)
+			b.WriteString(": ")
+			b.WriteString(value)
+			b.WriteString(SPLIT)
+		}
 	}
 
 	b.WriteString(SPLIT)
