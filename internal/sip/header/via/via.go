@@ -29,20 +29,6 @@ type Header struct {
 	Params   map[string]string
 }
 
-// you can't imagine how pissed I am. Section 3261.20.42 literally says:
-//
-// In this example, the message originated from a multi-homed host with
-// two addresses, 192.0.2.1 and 192.0.2.207.  The sender guessed wrong
-// as to which network interface would be used.  Erlang.bell-
-// telephone.com noticed the mismatch and added a parameter to the
-// previous hop's Via header field value, containing the address that
-// the packet actually came from.
-//
-// They are like covering the case where a client was too fucking stupid to just use the
-// correct ip (the sender GUESSED WRONG WTFFFFF just LOOK IT UP, WHY IS THE CLIENT GUESSING).
-// However, instead of just saying that this is explicitly WRONG -
-// they specify in their standard, that "the next server fixes it, probably"....
-
 // Serializes the Via header into a string (key is not included).
 func Serialize(header *Header) string {
 	b := strings.Builder{}
@@ -67,7 +53,9 @@ func Parse(str string) (*Header, error) {
 	// performs many unnecessary string reallocs, if this is bottlenecking
 	// it should be rewriten without the simple but slow string functions like TrimSpace() && SplitN().
 
-	header := &Header{}
+	header := &Header{
+		Params: map[string]string{},
+	}
 
 	block := strings.SplitN(str, "/", 3)
 	if len(block) != 3 {
