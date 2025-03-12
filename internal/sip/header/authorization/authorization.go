@@ -1,4 +1,4 @@
-package wwwauthenticate
+package authorization
 
 import (
 	"fmt"
@@ -11,9 +11,7 @@ const (
 	SCHEME_DIGEST = "Digest"
 )
 
-// WWW-Authenticate header as specified in the examples of 3261.22.2.
-// It only reads the first authentication scheme ('Digest realm="x", Digest realm="y"' => (realm 'y' is ignored)).
-// Supply multiple schemes by adding multiple headers.
+// Authorization header as specified in the examples of 3261.22.2.
 type Header struct {
 	Scheme SCHEME
 	Params map[string]string
@@ -45,7 +43,7 @@ func Parse(str string) (*Header, error) {
 
 	blocks := strings.SplitN(str, " ", 2)
 	if len(blocks) != 2 {
-		return nil, fmt.Errorf("invalid www-authenticate header: expected '<Scheme> <key>=\"<value>\", ...' got '%s'", str)
+		return nil, fmt.Errorf("invalid authorization header: expected '<Scheme> <key>=\"<value>\", ...' got '%s'", str)
 	}
 	header.Scheme = SCHEME(blocks[0])
 
@@ -53,12 +51,12 @@ func Parse(str string) (*Header, error) {
 	for _, param := range params {
 		kv := strings.SplitN(param, "=", 2)
 		if len(kv) != 2 {
-			return nil, fmt.Errorf("invalid www-authenticate header param: expected '... <key>=\"<value>\", ...' got '... %s, ...'", param)
+			return nil, fmt.Errorf("invalid authorization header param: expected '... <key>=\"<value>\", ...' got '... %s, ...'", param)
 		}
-		// trims crap from the value ('" sipsucks\""' => 'sipsucks\"')
-		header.Params[strings.TrimSpace(kv[0])] = strings.TrimSpace(strings.TrimSuffix(
-			strings.TrimPrefix(kv[1], "\""), "\"",
-		))
+		// trims crap from the value (' "sipsucks\""' => 'sipsucks\"')
+		header.Params[strings.TrimSpace(kv[0])] = strings.TrimSuffix(strings.TrimPrefix(
+			strings.TrimSpace(kv[1]), "\""), "\"",
+		)
 	}
 
 	return header, nil

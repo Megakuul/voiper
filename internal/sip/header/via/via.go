@@ -29,7 +29,6 @@ type Header struct {
 	Params   map[string]string
 }
 
-// Serializes the Via header into a string (key is not included).
 func Serialize(header *Header) string {
 	b := strings.Builder{}
 	b.WriteString(header.Version)
@@ -48,7 +47,6 @@ func Serialize(header *Header) string {
 	return b.String()
 }
 
-// Parses the Via header string
 func Parse(str string) (*Header, error) {
 	// performs many unnecessary string reallocs, if this is bottlenecking
 	// it should be rewriten without the simple but slow string functions like TrimSpace() && SplitN().

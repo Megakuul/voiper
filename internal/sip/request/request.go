@@ -1,14 +1,10 @@
 package request
 
 import (
-	"strconv"
 	"strings"
 
+	"github.com/megakuul/voiper/internal/sip/header/contentlength"
 	"github.com/megakuul/voiper/internal/sip/uri"
-)
-
-const (
-	SPLIT = "\r\n"
 )
 
 type METHOD string
@@ -106,7 +102,7 @@ type Request struct {
 	URI     uri.URI
 	Version string
 	Headers map[string][]string
-	Body    Body
+	Body    string
 }
 
 func SerializeRequest(request *Request) string {
@@ -117,23 +113,26 @@ func SerializeRequest(request *Request) string {
 	b.WriteString(uri.Serialize(&request.URI))
 	b.WriteString(" ")
 	b.WriteString(request.Version)
-	b.WriteString(SPLIT)
+	b.WriteString("\r\n")
 
-	request.Headers["content-type"] = []string{request.Body.Type()}
-	request.Headers["content-length"] = []string{strconv.Itoa(request.Body.Length())}
+	request.Headers["content-type"] = []string{
+		contentlength.Serialize(&contentlength.Header{
+			Length: uint32(len(request.Body)),
+		}),
+	}
 
 	for key, values := range request.Headers {
 		for _, value := range values {
 			b.WriteString(key)
 			b.WriteString(": ")
 			b.WriteString(value)
-			b.WriteString(SPLIT)
+			b.WriteString("\r\n")
 		}
 	}
 
-	b.WriteString(SPLIT)
+	b.WriteString("\r\n")
 
-	b.WriteString(request.Body.Content())
+	b.WriteString(request.Body)
 
 	return b.String()
 }
