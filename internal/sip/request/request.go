@@ -1,6 +1,7 @@
 package request
 
 import (
+	"io"
 	"strings"
 
 	"github.com/megakuul/voiper/internal/sip/header/contentlength"
@@ -135,4 +136,17 @@ func SerializeRequest(request *Request) string {
 	b.WriteString(request.Body)
 
 	return b.String()
+}
+
+type Header struct {
+	Method  METHOD
+	URI     uri.URI
+	Version string
+	Headers map[string][]string
+}
+
+func ParseHeader(reader io.ReadCloser) (*Header, error) {
+	header := &Header{}
+
+	reader.Read()
 }
