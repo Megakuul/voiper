@@ -1,6 +1,7 @@
 <script>
   import Logo from '../lib/component/Logo.svelte';
   import {EnableConfig, ListConfigs, RegisterSIP} from '../../wailsjs/go/app/App.js'
+  import Spinner from '../lib/component/Spinner.svelte';
 
   /** @type {Object.<string, boolean>} */
   let Configs = $state({});
@@ -34,6 +35,8 @@
 
 <div>
     <Logo width="1000"></Logo>
+
+    <Spinner color="white" class="bg-amber-500" width="300px"></Spinner>
 
     <button class="btn" onclick={voip}>VOIPPPPPPPPP</button>
     <button class="btn" onclick={list}>List</button>
