@@ -1,67 +1,38 @@
 <script>
-  import logo from './assets/images/logo-universal.png'
-  import {EnableConfig, ListConfigs, RegisterSIP} from '../wailsjs/go/app/App.js'
+    import { fade } from 'svelte/transition';
+  import Config from './Config/Config.svelte';
+  import Home from './Home/Home.svelte';
+  import Phone from './Phone/Phone.svelte';
 
   /** @type {string} */
   let Exception = $state(undefined);
 
-  /** @type {Object.<string, boolean>} */
-  let Configs = $state({});
-
-  async function voip() {
-    try {
-      await RegisterSIP()
-      return "WORKED"
-    } catch (err) {
-      return err
-    }
-  }
-
-  async function list() {
-    try {
-      Configs = {}
-      Configs = await ListConfigs()
-    } catch (err) {
-      Exception = err
-    }
-  }
-
-  async function enable(name) {
-    try {
-      await EnableConfig(name, "")
-    } catch (err) {
-      Exception = err
-    }
-  }
+  let Page = $state("home");
 </script>
 
-<main>
-  <img alt="Wails logo" id="logo" src="{logo}">
-    <button class="btn" onclick={voip}>VOIPPPPPPPPP</button>
-    <button class="btn" onclick={list}>List</button>
-  <div class="flex flex-col items-center">
-    {#each Object.entries(Configs) as [path, encrypted]}
-      <button class="w-1/2 bg-slate-500" onclick={() => enable(path)}>{path} {encrypted}</button>
-    {/each}
-  </div>
 
-  {#if Exception}
-    <div>ALARM {Exception}</div>
-  {/if}
-</main>
+<div class="flex flex-row justify-center gap-5">
+  <button onclick={() => Page = "home"}>Home</button>
+  <button onclick={() => Page = "phone"}>Phone</button>
+  <button onclick={() => Page = "config"}>Config</button>
+</div>
 
-<style>
+{#if Page=="home"}
+  <main transition:fade>
+    <Home></Home>
+  </main>
+{:else if Page=="phone"}
+  <main transition:fade>
+    <Phone></Phone>
+  </main>
+{:else if Page=="config"}
+  <main transition:fade>
+    <Config></Config>
+  </main>
+{/if}
 
-  #logo {
-    display: block;
-    width: 50%;
-    height: 50%;
-    margin: auto;
-    padding: 10% 0 0;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: 100% 100%;
-    background-origin: content-box;
-  }
 
-</style>
+
+{#if Exception}
+  <div>ALARM {Exception}</div>
+{/if}

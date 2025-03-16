@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/megakuul/voiper/internal/config"
-	"github.com/megakuul/voiper/internal/sip/body/empty"
 	"github.com/megakuul/voiper/internal/sip/header/via"
 	"github.com/megakuul/voiper/internal/sip/request"
 	"github.com/megakuul/voiper/internal/sip/uri"
@@ -64,7 +63,7 @@ func (c *Client) Register() error {
 				"call-id": {fmt.Sprintf("%s@%s", uuid.New().String(), host)}, // call-id is dialog unique
 				"cseq":    {fmt.Sprintf("1 REGISTER")},                       // cseq is just a dialog tracker that is used over the dialog and incremented on each request
 			},
-			Body: empty.NewBody(),
+			Body: "", //empty.NewBody(),
 		}),
 	))
 	if err != nil {

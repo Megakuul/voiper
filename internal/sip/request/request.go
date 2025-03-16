@@ -146,7 +146,8 @@ type Header struct {
 }
 
 func ParseHeader(reader io.ReadCloser) (*Header, error) {
-	header := &Header{}
+	// header := &Header{}
 
-	reader.Read()
+	// reader.Read()
+	return nil, nil
 }
