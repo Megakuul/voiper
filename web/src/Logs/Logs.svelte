@@ -7,6 +7,6 @@
 
 <div transition:fade class="flex flex-col items-center h-full" {...restProps}>
   <div>
-    Phone
+    Logs
   </div>
 </div>

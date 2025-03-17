@@ -16,10 +16,10 @@
   <!-- stone -->
   <g id="stone">
     <path id="stone-bg" d="M7573.5 1304L8061.63 2128.41L7573.5 2915.08L7081.94 2112.97L7573.5 1304Z" fill="#3A0770"/>
-    <path d="M7081.94 2112.97L7573.5 1304L7606.96 2199.61L7081.94 2112.97Z" fill="#99949D" fill-opacity="0.41"/>
-    <path d="M7606.96 2199.61L7573.5 1304L8061.63 2128.41L7606.96 2199.61Z" fill="#99949D" fill-opacity="0.09"/>
-    <path d="M7573.5 2915.08L7606.96 2199.61L8061.63 2128.41L7573.5 2915.08Z" fill="#232323" fill-opacity="0.18"/>
-    <path d="M7081.94 2112.97L7606.96 2199.61L7573.5 2915.08L7081.94 2112.97Z" fill="#54485F" fill-opacity="0.54"/>
+    <path d="M7081.94 2112.97L7573.5 1304L7606.96 2199.61L7081.94 2112.97Z" fill="{Palette.fgSecondary()}" fill-opacity="0.41"/>
+    <path d="M7606.96 2199.61L7573.5 1304L8061.63 2128.41L7606.96 2199.61Z" fill="{Palette.fgSecondary()}" fill-opacity="0.09"/>
+    <path d="M7573.5 2915.08L7606.96 2199.61L8061.63 2128.41L7573.5 2915.08Z" fill="{Palette.fgSecondary()}" fill-opacity="0.18"/>
+    <path d="M7081.94 2112.97L7606.96 2199.61L7573.5 2915.08L7081.94 2112.97Z" fill="{Palette.fgSecondary()}" fill-opacity="0.54"/>
   </g>
   
   <defs>
@@ -38,7 +38,6 @@
 
   #stone:hover {
     cursor: pointer;
-    
     transform: translateY(-200px);
   }
 
