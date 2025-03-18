@@ -12,24 +12,20 @@
 
 <style>
   #phone {
-    stroke: white;
-    stroke-width: 80px;
+    stroke-width: 300px;
     stroke-opacity: 0.6;
     stroke-linecap: round;
     stroke-dasharray: 13000;
     stroke-dashoffset: 0;
 
-    animation: animate-phone 4s ease-in-out infinite;
+    animation: animate-phone 3s ease-in-out infinite;
   }
 
   @keyframes animate-phone {
-    0%, 10% {
-      stroke-dashoffset: 13000;
-    }
-    50% {
+    0%, 100% {
       stroke-dashoffset: 0;
     }
-    90%, 100% {
+    50% {
       stroke-dashoffset: 13000;
     }
   }

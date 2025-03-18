@@ -1,6 +1,7 @@
 <script>
   import { fade } from "svelte/transition";
   let {
+    ExceptionRef = $bindable(),
     ...restProps
   } = $props();
 </script>

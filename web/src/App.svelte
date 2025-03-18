@@ -38,11 +38,11 @@
   </div>
   
   {#if Page=="home"}
-    <Home></Home>
+    <Home bind:ExceptionRef={Exception}></Home>
   {:else if Page=="phone"}
-    <Phone></Phone>
+    <Phone bind:ExceptionRef={Exception}></Phone>
   {:else if Page=="logs"}
-    <Logs></Logs>
+    <Logs bind:ExceptionRef={Exception}></Logs>
   {/if}
   
   {#if Exception}
