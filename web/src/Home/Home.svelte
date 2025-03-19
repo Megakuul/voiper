@@ -16,6 +16,17 @@
 
   /** @type {boolean} */
   let enablePopupState = $state(false);
+  /** @type {string} */
+  let enablePopupPassword = $state(undefined);
+
+  $effect(() => {
+    if (!enablePopupState) {
+      enablePopupPassword = ""
+    }
+  })
+
+  /** @type {boolean} */
+  let removePopupState = $state(false);
 
   async function list() {
     try {
@@ -41,12 +52,12 @@
   }
 
   /** 
-   * @param {string} name
+   * @param {string} path
    * @param {boolean} encrypted
    */
-   async function remove(name, encrypted) {
+   async function remove(path, encrypted) {
     try {
-      await RemoveConfig(name, encrypted)
+      await RemoveConfig(path, encrypted)
       await list()
     } catch (err) {
       ExceptionRef = err
@@ -54,12 +65,12 @@
   }
 
   /**
-   * @param {string} name
+   * @param {string} path
    * @param {string} key
    */
-  async function enable(name, key) {
+  async function enable(path, key) {
     try {
-      await EnableConfig(name, key)
+      await EnableConfig(path, key)
       await RegisterSIP()
     } catch (err) {
       ExceptionRef = err
@@ -106,8 +117,16 @@
         </button>
       </div>
 
+      <!-- TODO: extract to component (enablePopupState is applied to all)-->
       {#if enablePopupState}
-        <Popup title={"Enable Configuration?"} onsubmit={enable} bind:StateHook={enablePopupState}>
+        <Popup title={"Enable Configuration?"} onsubmit={enable(path, enablePopupPassword)} bind:StateHook={enablePopupState}>
+          {#if encrypted}
+            <input type="password" placeholder="Password" bind:value={enablePopupPassword} />
+          {/if}
+          <br>
+        </Popup>
+      {:else if removePopupState}
+        <Popup title={"Remove Configuration?"} onsubmit={remove(path, encrypted)} bind:StateHook={removePopupState}>
           <br>
         </Popup>
       {/if}
