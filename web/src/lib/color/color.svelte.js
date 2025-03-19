@@ -4,6 +4,8 @@
  * @property {() => string} bgSecondary
  * @property {() => string} fgPrimary
  * @property {() => string} fgSecondary
+ * @property {() => string} fgSuccess
+ * @property {() => string} fgError
  */
 
 /** @type {Palette} */
@@ -15,5 +17,7 @@ export function NewStarshipPalette() {
     bgSecondary: () => { return "#000000" },
     fgPrimary: () => { return "#1B1A55" },
     fgSecondary: () => { return "#535C91" },
+    fgSuccess: () => { return "#255F38" },
+    fgError: () => { return "#A31D1D" },
   }
 }

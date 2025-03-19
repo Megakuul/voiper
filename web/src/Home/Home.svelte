@@ -107,10 +107,8 @@
       </div>
 
       {#if enablePopupState}
-        <Popup title={"Enable Configuration?"} width={"500px"} height={"150px"} onsubmit={async () => {
-          await new Promise(resolve => setTimeout(resolve, 5000))
-        }} bind:StateHook={enablePopupState}>
-          <span></span>
+        <Popup title={"Enable Configuration?"} onsubmit={enable} bind:StateHook={enablePopupState}>
+          <br>
         </Popup>
       {/if}
     {/each}

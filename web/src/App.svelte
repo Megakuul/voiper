@@ -1,16 +1,17 @@
 <script>
-  import { fade } from 'svelte/transition';
   import Logs from './Logs/Logs.svelte';
   import Home from './Home/Home.svelte';
   import Phone from './Phone/Phone.svelte';
-    import { Palette } from './lib/color/color.svelte';
+  import { Palette } from './lib/color/color.svelte';
+  import Message from './lib/component/Message.svelte';
+
+  let Page = $state("home");
 
   /** @type {string} */
   let Exception = $state(undefined);
-
-  let Page = $state("home");
 </script>
 
+<Message title={"Error"} color={Palette.fgError()} duration={5000} bind:MessageRef={Exception}></Message>
 
 <center style="background-color: {Palette.bgPrimary()};" class="h-full box-border">
   <div class="flex flex-row justify-around gap-4 m-6 max-w-[1200px]">
@@ -43,10 +44,6 @@
     <Phone bind:ExceptionRef={Exception}></Phone>
   {:else if Page=="logs"}
     <Logs bind:ExceptionRef={Exception}></Logs>
-  {/if}
-  
-  {#if Exception}
-    <div>ALARM {Exception}</div>
   {/if}
 </center>
 

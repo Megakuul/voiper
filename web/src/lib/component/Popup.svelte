@@ -5,8 +5,6 @@
 
   let {
     title,
-    width,
-    height,
     onsubmit,
     StateHook = $bindable(),
     children,
@@ -19,7 +17,7 @@
     await onsubmit();
     loadingState = false;
     StateHook = false;
-  } 
+  }
 
   $effect(() => {
     if (!document) return
@@ -51,8 +49,8 @@
 </script>
 
 <div transition:fade class="fixed z-50 top-0 left-0 h-full w-screen flex flex-col items-center justify-center bg-slate-950/80">
-  <div style="width: {width}; height: {height}; background-color: {Palette.bgPrimary()}; border-color: {Palette.fgPrimary()};" 
-    class="flex flex-col items-center gap-2 p-6 rounded-2xl border-2 overflow-hidden">
+  <div style="background-color: {Palette.bgPrimary()}; border-color: {Palette.fgPrimary()};" 
+    class="flex flex-col items-center gap-2 min-w-md p-6 rounded-2xl border-2 overflow-hidden">
     <h1 class="mt-1 text-2xl font-bold">{title}</h1>
     {@render children()}
     <div class="mt-auto w-full flex flex-row justify-around gap-6">
