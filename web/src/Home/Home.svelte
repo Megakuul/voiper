@@ -14,64 +14,10 @@
   /** @type {Object.<string, boolean>} */
   let Configs = $state({});
 
-  /** @type {boolean} */
-  let enablePopupState = $state(false);
-  /** @type {string} */
-  let enablePopupPassword = $state(undefined);
-
-  $effect(() => {
-    if (!enablePopupState) {
-      enablePopupPassword = ""
-    }
-  })
-
-  /** @type {boolean} */
-  let removePopupState = $state(false);
-
   async function list() {
     try {
       Configs = {}
       Configs = await ListConfigs()
-    } catch (err) {
-      ExceptionRef = err
-    }
-  }
-
-  /** 
-   * @param {import('wailsjs/go/models').config.Config} config
-   * @param {string} name
-   * @param {string} key
-   */
-  async function add(config, name, key) {
-    try {
-      await AddConfig(config, name, key)
-      await list()
-    } catch (err) {
-      ExceptionRef = err
-    }
-  }
-
-  /** 
-   * @param {string} path
-   * @param {boolean} encrypted
-   */
-   async function remove(path, encrypted) {
-    try {
-      await RemoveConfig(path, encrypted)
-      await list()
-    } catch (err) {
-      ExceptionRef = err
-    }
-  }
-
-  /**
-   * @param {string} path
-   * @param {string} key
-   */
-  async function enable(path, key) {
-    try {
-      await EnableConfig(path, key)
-      await RegisterSIP()
     } catch (err) {
       ExceptionRef = err
     }
@@ -116,20 +62,6 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24"><path fill="currentColor" fill-opacity="0" stroke="currentColor" stroke-dasharray="40" stroke-dashoffset="40" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6l10 6l-10 6Z"><animate fill="freeze" attributeName="fill-opacity" begin="0.5s" dur="0.15s" values="0;0.3"/><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="40;0"/></path></svg>
         </button>
       </div>
-
-      <!-- TODO: extract to component (enablePopupState is applied to all)-->
-      {#if enablePopupState}
-        <Popup title={"Enable Configuration?"} onsubmit={enable(path, enablePopupPassword)} bind:StateHook={enablePopupState}>
-          {#if encrypted}
-            <input type="password" placeholder="Password" bind:value={enablePopupPassword} />
-          {/if}
-          <br>
-        </Popup>
-      {:else if removePopupState}
-        <Popup title={"Remove Configuration?"} onsubmit={remove(path, encrypted)} bind:StateHook={removePopupState}>
-          <br>
-        </Popup>
-      {/if}
     {/each}
 
     <div class="flex flex-row gap-6 w-full">

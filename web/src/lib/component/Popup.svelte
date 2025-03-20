@@ -6,7 +6,7 @@
   let {
     title,
     onsubmit,
-    StateHook = $bindable(),
+    StateRef = $bindable(),
     children,
   } = $props();
 
@@ -16,7 +16,7 @@
     loadingState = true;
     await onsubmit();
     loadingState = false;
-    StateHook = false;
+    StateRef = false;
   }
 
   $effect(() => {
@@ -24,7 +24,7 @@
 
     const cleanupKeydown = on(document, "keydown", (e) => {
       if (e.key === "Escape") {
-        setTimeout(() => StateHook = false, 0) // use timeout to ensure svelte reacts
+        setTimeout(() => StateRef = false, 0) // use timeout to ensure svelte reacts
       } else if (e.key === "Enter") {
         setTimeout(() => submit(), 0) // use timeout to ensure svelte reacts
       }
@@ -55,7 +55,7 @@
     {@render children()}
     <div class="mt-auto w-full flex flex-row justify-around gap-6">
       <button class="w-1/2 py-2 bg-slate-700/30 rounded-lg hover:bg-slate-700/20 transition-all duration-500" 
-        onclick={() => StateHook = false}>
+        onclick={() => StateRef = false}>
         Cancel
       </button>
       <button class="w-1/2 flex flex-row items-center justify-center gap-2 py-2 bg-slate-700/50 rounded-lg hover:bg-slate-700/40 transition-all duration-500" 
