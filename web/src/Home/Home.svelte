@@ -8,8 +8,11 @@
   import Remove from './Remove.svelte';
   import Edit from './Edit.svelte';
   import Crypt from './Crypt.svelte';
-    import { flip } from 'svelte/animate';
+  import { flip } from 'svelte/animate';
 
+  /** @type {{
+   * ExceptionRef: string
+   * }} */
   let {
     ExceptionRef = $bindable(),
     ...restProps

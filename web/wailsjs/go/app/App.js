@@ -14,10 +14,6 @@ export function ListConfigs() {
   return window['go']['app']['App']['ListConfigs']();
 }
 
-export function RegisterSIP() {
-  return window['go']['app']['App']['RegisterSIP']();
-}
-
 export function RemoveConfig(arg1, arg2) {
   return window['go']['app']['App']['RemoveConfig'](arg1, arg2);
 }

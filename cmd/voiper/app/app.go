@@ -2,16 +2,22 @@ package app
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"sync"
 
 	"github.com/megakuul/voiper/internal/config"
 	"github.com/megakuul/voiper/internal/sip"
+	"github.com/megakuul/voiper/internal/util"
 )
 
 type App struct {
-	ctx        context.Context
-	basePath   string
+	ctx      context.Context
+	basePath string
+
+	clientLock sync.Mutex
+	client     *sip.Client
+
 	configLock sync.Mutex
 	config     *config.Config
 }
@@ -19,7 +25,9 @@ type App struct {
 type AppOption func(*App)
 
 func NewApp(opts ...AppOption) *App {
-	app := &App{}
+	app := &App{
+		basePath: "",
+	}
 
 	for _, opt := range opts {
 		opt(app)
@@ -39,9 +47,14 @@ func WithBase(path string) AppOption {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	slog.SetDefault(slog.New(slog.NewJSONHandler(util.NewEventWriter(a.ctx, "log"), &slog.HandlerOptions{
+		Level:     slog.LevelDebug,
+		AddSource: true,
+	})))
 }
 
 func (a *App) ListConfigs() (map[string]bool, error) {
+	slog.Warn("Listed Configs asdfa sdf")
 	return config.ListConfigs(a.basePath)
 }
 
@@ -63,13 +76,13 @@ func (a *App) EnableConfig(name, decryptionKey string) error {
 		return err
 	}
 	a.configLock.Lock()
+	a.clientLock.Lock()
 	defer a.configLock.Unlock()
+	defer a.clientLock.Unlock()
 	a.config = cfg
-	return nil
-}
-
-func (a *App) RegisterSIP() error {
-	client := sip.NewClient(a.config)
-
-	return client.Register()
+	if a.client != nil {
+		a.client.Close()
+	}
+	a.client = sip.NewClient(a.config)
+	return a.client.Register(context.TODO())
 }

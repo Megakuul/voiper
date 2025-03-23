@@ -1,6 +1,6 @@
 <script>
   import Popup from "../../src/lib/component/Popup.svelte";
-  import { EnableConfig, RegisterSIP } from "../../wailsjs/go/app/App";
+  import { EnableConfig } from "../../wailsjs/go/app/App";
 
   /** @type {{ 
    * class: string,
@@ -34,7 +34,6 @@
   async function enable(name, key) {
     try {
       await EnableConfig(name, key)
-      await RegisterSIP()
     } catch (err) {
       ExceptionRef = err
     }
