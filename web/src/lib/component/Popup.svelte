@@ -3,6 +3,12 @@
   import { Palette } from "../color/color.svelte";
   import { fade } from "svelte/transition";
 
+  /** @type {{ 
+  * title: string
+  * onsubmit: function(): Promise<void>
+  * StateRef: boolean,
+  * children: any,
+  * }} */
   let {
     title,
     onsubmit,

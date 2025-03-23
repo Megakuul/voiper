@@ -45,16 +45,20 @@ func (a *App) ListConfigs() (map[string]bool, error) {
 	return config.ListConfigs(a.basePath)
 }
 
-func (a *App) AddConfig(cfg *config.Config, name, encryptionKey string) error {
+func (a *App) GetConfig(name, decryptionKey string) (*config.Config, error) {
+	return config.LoadConfig(filepath.Join(a.basePath, name), decryptionKey)
+}
+
+func (a *App) SetConfig(cfg *config.Config, name, encryptionKey string) error {
 	return config.WriteConfig(cfg, filepath.Join(a.basePath, name), encryptionKey)
 }
 
-func (a *App) RemoveConfig(path string, encrypted bool) error {
-	return config.RemoveConfig(path, encrypted)
+func (a *App) RemoveConfig(name string, encrypted bool) error {
+	return config.RemoveConfig(filepath.Join(a.basePath, name), encrypted)
 }
 
-func (a *App) EnableConfig(path, decryptionKey string) error {
-	cfg, err := config.LoadConfig(path, decryptionKey)
+func (a *App) EnableConfig(name, decryptionKey string) error {
+	cfg, err := config.LoadConfig(filepath.Join(a.basePath, name), decryptionKey)
 	if err != nil {
 		return err
 	}

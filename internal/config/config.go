@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -40,20 +39,13 @@ func ListConfigs(basePath string) (map[string]bool, error) {
 
 	configs := map[string]bool{}
 	for _, entry := range entries {
-		path, err := filepath.Abs(
-			filepath.Join(basePath, entry.Name()),
-		)
-		if err != nil {
-			return nil, err
-		}
-
 		if strings.HasSuffix(entry.Name(), CONFIG_EXTENSION+SECURE_EXTENSION) {
 			configs[strings.TrimSuffix(
-				path, CONFIG_EXTENSION+SECURE_EXTENSION,
+				entry.Name(), CONFIG_EXTENSION+SECURE_EXTENSION,
 			)] = true
 		} else if strings.HasSuffix(entry.Name(), CONFIG_EXTENSION) {
 			configs[strings.TrimSuffix(
-				path, CONFIG_EXTENSION,
+				entry.Name(), CONFIG_EXTENSION,
 			)] = false
 		}
 	}
@@ -153,7 +145,7 @@ func WriteConfig(config *Config, path, encryptionKey string) error {
 			return fmt.Errorf("failed to generate nonce: %w", err)
 		}
 
-		rawConfig = gcm.Seal(nil, nonce, rawConfig, nil)
+		rawConfig = append(append(salt, nonce...), gcm.Seal(nil, nonce, rawConfig, nil)...)
 	}
 
 	file, err := os.Create(path)

@@ -1,5 +1,0 @@
-server = "10.1.10.252"
-port = 5060
-username = "voiper"
-password = "password"
-display_name = "Voiper"
