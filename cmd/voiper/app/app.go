@@ -54,7 +54,10 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) ListConfigs() (map[string]bool, error) {
+	slog.Debug("This is debug crapa asddfjas d fölasdlf jalsödfjlasjdf öalsdjflöajdsflaösjdflasf")
+	slog.Info("Ich bin eine INFORMATION")
 	slog.Warn("Listed Configs asdfa sdf")
+	slog.Error("ALARM ALARM ALARM")
 	return config.ListConfigs(a.basePath)
 }
 

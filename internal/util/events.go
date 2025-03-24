@@ -20,7 +20,6 @@ func NewEventWriter(ctx context.Context, event string) *EventWriter {
 }
 
 func (e EventWriter) Write(data []byte) (int, error) {
-	println(string(data))
 	runtime.EventsEmit(e.ctx, e.event, string(data))
 	return len(data), nil
 }

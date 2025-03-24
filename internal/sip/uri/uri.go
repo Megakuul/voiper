@@ -13,7 +13,7 @@ type URI struct {
 	Secure bool
 	User   string
 	Host   string
-	Param  map[string]string
+	Params map[string]string
 }
 
 // Serializes a sip uri (RFC 3261.19.1).
@@ -29,7 +29,7 @@ func Serialize(uri *URI) string {
 	b.WriteString("@")
 	b.WriteString(uri.Host)
 
-	for key, value := range uri.Param {
+	for key, value := range uri.Params {
 		b.WriteString(";")
 		b.WriteString(key)
 		b.WriteString("=")
@@ -45,7 +45,7 @@ func Parse(str string) (*URI, error) {
 	// it should be rewriten without the simple but slow string functions like SplitN().
 
 	uri := &URI{
-		Param: map[string]string{},
+		Params: map[string]string{},
 	}
 
 	blocks := strings.SplitN(str, "@", 2)
@@ -67,25 +67,25 @@ func Parse(str string) (*URI, error) {
 	uri.Host = lhs[len(lhs)-1]
 
 	rhs := strings.Split(blocks[1], ";")
-	for i, params := range rhs {
+	for i, param := range rhs {
 		if i == 0 {
-			if params == "" {
+			if param == "" {
 				return nil, fmt.Errorf(
-					"invalid uri rhs: expected '@<host>[:<port>]' got '@%s'", params,
+					"invalid uri rhs: expected '@<host>[:<port>]' got '@%s'", param,
 				)
 			}
-			uri.Host = params
+			uri.Host = param
 			continue
 		}
 
-		kv := strings.SplitN(params, "=", 2)
+		kv := strings.SplitN(param, "=", 2)
 		if len(kv) != 2 {
-			return nil, fmt.Errorf(
-				"invalid uri param: expected ';<key>=<value>' got ';%s'", params,
-			)
+			return nil, fmt.Errorf("invalid uri param: expected '... <key>=\"<value>\", ...' got '... %s, ...'", param)
 		}
-
-		uri.Param[kv[0]] = kv[1]
+		// trims crap from the value (' "sipsucks\""' => 'sipsucks\"')
+		uri.Params[strings.TrimSpace(kv[0])] = strings.TrimSuffix(strings.TrimPrefix(
+			strings.TrimSpace(kv[1]), "\""), "\"",
+		)
 	}
 
 	return uri, nil
