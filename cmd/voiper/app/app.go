@@ -9,6 +9,7 @@ import (
 	"github.com/megakuul/voiper/internal/config"
 	"github.com/megakuul/voiper/internal/sip"
 	"github.com/megakuul/voiper/internal/util"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
@@ -54,10 +55,6 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) ListConfigs() (map[string]bool, error) {
-	slog.Debug("This is debug crapa asddfjas d fölasdlf jalsödfjlasjdf öalsdjflöajdsflaösjdflasf")
-	slog.Info("Ich bin eine INFORMATION")
-	slog.Warn("Listed Configs asdfa sdf")
-	slog.Error("ALARM ALARM ALARM")
 	return config.ListConfigs(a.basePath)
 }
 
@@ -86,6 +83,12 @@ func (a *App) EnableConfig(name, decryptionKey string) error {
 	if a.client != nil {
 		a.client.Close()
 	}
+
 	a.client = sip.NewClient(a.config)
-	return a.client.Register(context.TODO())
+	err = a.client.Register(context.Background())
+	if err != nil {
+		return err
+	}
+	runtime.EventsEmit(a.ctx, "active-config", name)
+	return nil
 }

@@ -13,9 +13,14 @@
 
   /** @type {Object[]} */
   let LogEntries = $state([])
-
   EventsOn("log", (data) => {
     LogEntries.push(data)
+  })
+
+  /** @type {string} */
+  let ActiveConfig = $state("")
+  EventsOn("active-config", (data) => {
+    ActiveConfig = data
   })
 
   /** @type {string} */
@@ -66,7 +71,7 @@
   </div>
   
   {#if Page=="home"}
-    <Home bind:ExceptionRef={Exception}></Home>
+    <Home ActiveConfig={ActiveConfig} bind:ExceptionRef={Exception}></Home>
   {:else if Page=="phone"}
     <Phone bind:ExceptionRef={Exception}></Phone>
   {:else if Page=="logs"}

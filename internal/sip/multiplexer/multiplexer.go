@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strconv"
 	"unsafe"
@@ -13,7 +14,7 @@ type Processor struct {
 	packetSize int
 }
 
-func (p *Processor) ProcessUnreliable(reader io.Reader, errChan chan<- error) error {
+func (p *Processor) ProcessUnreliable(reader io.Reader) error {
 	header := &Header{}
 	packet := make([]byte, p.packetSize)
 
@@ -21,7 +22,7 @@ func (p *Processor) ProcessUnreliable(reader io.Reader, errChan chan<- error) er
 		n, err := reader.Read(packet)
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
-				errChan <- err
+				slog.Warn(fmt.Sprintf("network read error: %v", err))
 				continue
 			}
 			return err
@@ -29,12 +30,14 @@ func (p *Processor) ProcessUnreliable(reader io.Reader, errChan chan<- error) er
 
 		err = ParseHeader(packet[:n], header)
 		if err != nil {
-			errChan <- err
+			slog.Warn(fmt.Sprintf("packet error: %v", err))
 			continue
 		}
 
-		if header.ContentLength > packet[:n] {
-			// ERROR
+		// heuristic to avoid parsing packets that are definitely to long.
+		if header.ContentLength > int64(n) {
+			slog.Warn("packet error: specified content-length exceeds the udp packet buffer")
+			continue
 		}
 
 	}
@@ -52,7 +55,7 @@ const CL_HDR = "content-length:"
 const CL_HDR_LEN = len(CL_HDR)
 
 // ParseHeader does basic parsing on the header that is relevant for the transport layer.
-// It performs zero allocations after initialization... not because it's required, but because it sounds cool.
+// It performs zero allocations after initialization... not because it's required, but because it's cool.
 func ParseHeader(input []byte, header *Header) error {
 	var err error
 

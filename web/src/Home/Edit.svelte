@@ -75,9 +75,9 @@
 {:else if popupState}
   <Popup title={"Edit Configuration"} onsubmit={() => update(config, name, password)} bind:StateRef={popupState}>
     <input placeholder="Name" bind:value={name} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
-    <input placeholder="Server" bind:value={config.Server} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
-    <input placeholder="Display Name" bind:value={config.DisplayName} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
-    <input placeholder="Username" bind:value={config.Username} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
-    <input placeholder="Password" bind:value={config.Password} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
+    <input placeholder="SIP Server" bind:value={config.Server} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
+    <input placeholder="SIP Display Name" bind:value={config.DisplayName} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
+    <input placeholder="SIP Username" bind:value={config.Username} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
+    <input type="password" placeholder="SIP Password" bind:value={config.Password} class="w-full my-2 py-2 px-3 bg-slate-700/20 rounded-lg focus:outline-0" />
   </Popup>
 {/if}

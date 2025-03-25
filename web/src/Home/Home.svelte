@@ -11,9 +11,11 @@
   import { flip } from 'svelte/animate';
 
   /** @type {{
+   * ActiveConfig: string
    * ExceptionRef: string
    * }} */
   let {
+    ActiveConfig,
     ExceptionRef = $bindable(),
     ...restProps
   } = $props();
@@ -52,7 +54,7 @@
         <Crypt name={name} encrypted={encrypted} PostHook={list} bind:ExceptionRef={ExceptionRef}
           class="hover:bg-slate-600/40 p-2 rounded-xl transition-all duration-700">
         </Crypt>
-        <Enable name={name} encrypted={encrypted} bind:ExceptionRef={ExceptionRef} 
+        <Enable name={name} encrypted={encrypted} active={name === ActiveConfig} bind:ExceptionRef={ExceptionRef} 
           class="hover:bg-slate-600/40 p-1 rounded-xl transition-all duration-700">
         </Enable>
       </div>
