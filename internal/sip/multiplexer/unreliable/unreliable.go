@@ -19,8 +19,13 @@ type Multiplexer struct {
 	rootCtx       context.Context
 	rootCtxCancel context.CancelFunc
 
-	processorLock sync.Mutex
-	processorChan chan<- *request.Request
+	queueSize  int
+	packetSize int
+
+	processorLock  sync.Mutex
+	processorState bool
+
+	requestChan chan<- *request.Request
 
 	transactionsLock sync.RWMutex
 	transactions     map[string]chan *response.Response
@@ -42,7 +47,27 @@ func New(opts ...Option) *Multiplexer {
 
 func (m *Multiplexer) Start(id string, req *request.Request) (<-chan *response.Response, error) {
 	m.processorLock.Lock()
+	if !m.processorState {
+		conn, err := net.Dial("udp", "10.1.10.252:5060")
+		if err != nil {
+			return nil, err
+		}
+		go func() {
+			buffer := make([]byte, m.packetSize)
+			conn.Read()
+		}()
+		net.Dial("udp", "10.1.10.252:5060")
+	}
+	m.processorLock.Unlock()
 
+	m.transactionsLock.Lock()
+	defer m.transactionsLock.Unlock()
+	if transaction, ok := m.transactions[id]; ok {
+		close(transaction)
+	}
+	m.transactions[id] = make(chan *response.Response, m.bufferSize)
+	m.requestChan <- req
+	return m.transactions[id], nil
 }
 
 func (m *Multiplexer) Stop(id string) error {
