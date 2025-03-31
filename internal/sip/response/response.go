@@ -13,39 +13,62 @@ const (
 )
 
 type Response struct {
-	Version string
-	Code    string
-	Status  string
-	Headers []string
+	Version []byte
+	Code    []byte
+	Status  []byte
+	Headers map[string][][]byte
 	Body    io.Reader
 }
 
-func Serialize(response *Response) string {
-	b := strings.Builder{}
+func Serialize(response *Response) io.Reader {
+	b := bytes.Buffer{}
 
-	b.WriteString(response.Version)
+	b.Write(response.Version)
 	b.WriteString(" ")
-	b.WriteString(response.Code)
+	b.Write(response.Code)
 	b.WriteString(" ")
-	b.WriteString(response.Status)
+	b.Write(response.Status)
 	b.WriteString("\r\n")
 
-	for _, header := range response.Headers {
-		b.WriteString(header)
-		b.WriteString("\r\n")
+	for key, values := range response.Headers {
+		for _, value := range values {
+			b.WriteString(key)
+			b.WriteString(":")
+			b.Write(value)
+			b.WriteString("\r\n")
+		}
 	}
 
 	b.WriteString("\r\n")
 
-	body, _ := io.ReadAll(response.Body)
-	b.WriteString(string(body))
+	return io.MultiReader(bytes.NewReader(b.Bytes()), response.Body)
+}
 
-	return b.String()
+// Peek checks if the io.Reader contains a valid response head.
+// In any case it returns an io.Reader that reads exactly from where it left of before peeking.
+func Peek(input io.Reader) (bool, io.Reader) {
+	buffer := make([]byte, 100)
+	n, err := input.Read(buffer)
+	if err != nil {
+		return false, input
+	}
+	lines := bytes.Split(buffer[:n], []byte("\r\n"))
+	if len(lines) < 2 {
+		return false, io.MultiReader(bytes.NewBuffer(buffer[:n]), input)
+	}
+	blocks := bytes.Split(lines[0], []byte(" "))
+	if len(blocks) != 3 {
+		return false, io.MultiReader(bytes.NewBuffer(buffer[:n]), input)
+	}
+	if !bytes.Equal(blocks[0], []byte("SIP/2.0")) {
+		return false, io.MultiReader(bytes.NewBuffer(buffer[:n]), input)
+	}
+	return true, io.MultiReader(bytes.NewBuffer(buffer[:n]), input)
 }
 
 func Parse(input io.Reader) (*Response, error) {
 	response := &Response{}
-	builder := strings.Builder{}
+	builder := bytes.Buffer{}
 
 	reads := 0
 	for {
@@ -70,16 +93,25 @@ func Parse(input io.Reader) (*Response, error) {
 					return response, nil
 				}
 
-				line := builder.String()
+				line := builder.Bytes()
 				builder.Reset()
-				if response.Version == "" {
-					blocks := strings.SplitN(line, " ", 3)
+				if len(response.Version) == 0 {
+					blocks := bytes.SplitN(line, []byte(" "), 3)
 					if len(blocks) != 3 {
-						return nil, fmt.Errorf("invalid header response-line: expected '<version> <code> <status>'")
+						return nil, fmt.Errorf(
+							"invalid response: expected '<version> <code> <status>\\r\\n' got '%.15s...'", string(line),
+						)
 					}
 					response.Version, response.Code, response.Status = blocks[0], blocks[1], blocks[2]
 				} else {
-					response.Headers = append(response.Headers, line)
+					blocks := bytes.SplitN(line, []byte(":"), 2)
+					if len(blocks) != 2 {
+						return nil, fmt.Errorf(
+							"invalid response header: expected '<key>: <value>\\r\\n'\\r\\n' got '%.15s...'", string(line),
+						)
+					}
+					key := strings.ToLower(string(blocks[0]))
+					response.Headers[key] = append(response.Headers[key], blocks[1])
 				}
 				continue
 			}

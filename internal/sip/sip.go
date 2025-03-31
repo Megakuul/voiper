@@ -6,11 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/megakuul/voiper/internal/config"
-	"github.com/megakuul/voiper/internal/sip/header/via"
-	"github.com/megakuul/voiper/internal/sip/request"
-	"github.com/megakuul/voiper/internal/sip/uri"
 )
 
 // implements some parts of the SIP protocol
@@ -53,30 +49,6 @@ func (c *Client) Register(ctx context.Context) error {
 		return err
 	}
 
-	_, err = conn.Write([]byte(
-		request.SerializeRequest(&request.Request{
-			Method: request.REGISTER,
-			URI: uri.URI{
-				Secure: false,
-				User:   c.config.Username,
-				Host:   host,
-			},
-			Version: "SIP/2.0",
-			Headers: map[string][]string{
-				"via": {via.Serialize(&via.Header{
-					Version:  "SIP/2.0",
-					Protocol: via.PROTOCOL_TCP,
-					Host:     host,
-					Params:   map[string]string{"branch": via.IDIOT_SANDWICH_COOKIE + uuid.New().String()}, // branch is transaction unique
-				})},
-				"to":      {fmt.Sprintf("Voiper <sip:voiper@%s>", host)},
-				"from":    {fmt.Sprintf("Voiper <sip:voiper@%s>", host)},
-				"call-id": {fmt.Sprintf("%s@%s", uuid.New().String(), host)}, // call-id is dialog unique
-				"cseq":    {fmt.Sprintf("1 REGISTER")},                       // cseq is just a dialog tracker that is used over the dialog and incremented on each request
-			},
-			Body: "", //empty.NewBody(),
-		}),
-	))
 	if err != nil {
 		return err
 	}

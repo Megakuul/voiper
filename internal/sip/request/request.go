@@ -13,39 +13,62 @@ const (
 )
 
 type Request struct {
-	Method  string
-	URI     string
-	Version string
-	Headers []string
+	Method  []byte
+	URI     []byte
+	Version []byte
+	Headers map[string][][]byte
 	Body    io.Reader
 }
 
-func Serialize(request *Request) string {
-	b := strings.Builder{}
+func Serialize(request *Request) io.Reader {
+	b := bytes.Buffer{}
 
-	b.WriteString(request.Method)
+	b.Write(request.Method)
 	b.WriteString(" ")
-	b.WriteString(request.URI)
+	b.Write(request.URI)
 	b.WriteString(" ")
-	b.WriteString(request.Version)
+	b.Write(request.Version)
 	b.WriteString("\r\n")
 
-	for _, header := range request.Headers {
-		b.WriteString(header)
-		b.WriteString("\r\n")
+	for key, values := range request.Headers {
+		for _, value := range values {
+			b.WriteString(key)
+			b.WriteString(":")
+			b.Write(value)
+			b.WriteString("\r\n")
+		}
 	}
 
 	b.WriteString("\r\n")
 
-	body, _ := io.ReadAll(request.Body)
-	b.WriteString(string(body))
+	return io.MultiReader(bytes.NewReader(b.Bytes()), request.Body)
+}
 
-	return b.String()
+// Peek checks if the io.Reader contains a valid request head.
+// In any case it returns an io.Reader that reads exactly from where it left of before peeking.
+func Peek(input io.Reader) (bool, io.Reader) {
+	buffer := make([]byte, 100)
+	n, err := input.Read(buffer)
+	if err != nil {
+		return false, input
+	}
+	lines := bytes.Split(buffer[:n], []byte("\r\n"))
+	if len(lines) < 2 {
+		return false, io.MultiReader(bytes.NewBuffer(buffer[:n]), input)
+	}
+	blocks := bytes.Split(lines[0], []byte(" "))
+	if len(blocks) != 3 {
+		return false, io.MultiReader(bytes.NewBuffer(buffer[:n]), input)
+	}
+	if !bytes.Equal(blocks[2], []byte("SIP/2.0")) {
+		return false, io.MultiReader(bytes.NewBuffer(buffer[:n]), input)
+	}
+	return true, io.MultiReader(bytes.NewBuffer(buffer[:n]), input)
 }
 
 func Parse(input io.Reader) (*Request, error) {
 	request := &Request{}
-	builder := strings.Builder{}
+	builder := bytes.Buffer{}
 
 	reads := 0
 	for {
@@ -70,16 +93,25 @@ func Parse(input io.Reader) (*Request, error) {
 					return request, nil
 				}
 
-				line := builder.String()
+				line := builder.Bytes()
 				builder.Reset()
-				if request.Version == "" {
-					blocks := strings.SplitN(line, " ", 3)
+				if len(request.Version) == 0 {
+					blocks := bytes.SplitN(line, []byte(" "), 3)
 					if len(blocks) != 3 {
-						return nil, fmt.Errorf("invalid header request-line: expected '<METHOD> <uri> <version>'")
+						return nil, fmt.Errorf(
+							"invalid request: expected '<METHOD> <uri> <version>\\r\\n' got '%.15s...'", string(line),
+						)
 					}
 					request.Method, request.URI, request.Version = blocks[0], blocks[1], blocks[2]
 				} else {
-					request.Headers = append(request.Headers, line)
+					blocks := bytes.SplitN(line, []byte(":"), 2)
+					if len(blocks) != 2 {
+						return nil, fmt.Errorf(
+							"invalid request header: expected '<key>: <value>\\r\\n' got '%.15s...'", string(line),
+						)
+					}
+					key := strings.ToLower(string(blocks[0]))
+					request.Headers[key] = append(request.Headers[key], blocks[1])
 				}
 				continue
 			}
