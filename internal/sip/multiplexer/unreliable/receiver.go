@@ -26,6 +26,7 @@ func (m *Multiplexer) ensureReceiver() error {
 	if err != nil {
 		return err
 	}
+
 	ctx, cancel := context.WithCancel(m.rootCtx)
 	m.operationWg.Add(1)
 	go func() {
@@ -103,6 +104,8 @@ func (m *Multiplexer) ensureReceiver() error {
 			}
 		}
 	}()
+
+	m.receiverState = true
 
 	return nil
 }

@@ -24,6 +24,7 @@ func (m *Multiplexer) ensureReceiver() error {
 	if err != nil {
 		return err
 	}
+
 	m.operationWg.Add(1)
 	go func() {
 		defer m.operationWg.Done()
@@ -43,6 +44,8 @@ func (m *Multiplexer) ensureReceiver() error {
 			m.accept(listener)
 		}
 	}()
+
+	m.receiverState = true
 
 	return nil
 }

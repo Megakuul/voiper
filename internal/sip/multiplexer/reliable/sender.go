@@ -26,6 +26,7 @@ func (m *Multiplexer) ensureSender() error {
 	if err != nil {
 		return err
 	}
+
 	ctx, cancel := context.WithCancel(m.rootCtx)
 	m.operationWg.Add(1)
 	go func() {
@@ -78,9 +79,14 @@ func (m *Multiplexer) ensureSender() error {
 	go func() {
 		defer m.operationWg.Done()
 		for {
-			m.multiplex(ctx, conn, responseChan)
+			err = m.multiplex(ctx, conn, responseChan)
+			if err != nil {
+				m.logger.Warn(err.Error())
+			}
 		}
 	}()
+
+	m.senderState = true
 
 	return nil
 }

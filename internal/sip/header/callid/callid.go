@@ -1,35 +1,35 @@
 package callid
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 )
 
 // Call-ID header as specified in 3261.20.8.
 type Header struct {
-	Identifier string
-	Host       string
+	Identifier []byte
+	Host       []byte
 }
 
-func Serialize(header *Header) string {
-	b := strings.Builder{}
+func Serialize(header *Header) []byte {
+	b := bytes.Buffer{}
 
-	b.WriteString(header.Identifier)
+	b.Write(header.Identifier)
 	b.WriteString("@")
-	b.WriteString(header.Host)
+	b.Write(header.Host)
 
-	return b.String()
+	return b.Bytes()
 }
 
-func Parse(str string) (*Header, error) {
+func Parse(input []byte) (*Header, error) {
 	// performs many unnecessary string reallocs, if this is bottlenecking
 	// it should be rewriten without the simple but slow string functions like TrimSpace() && SplitN().
 
 	header := &Header{}
 
-	blocks := strings.Split(str, "@")
+	blocks := bytes.Split(bytes.TrimSpace(input), []byte("@"))
 	if len(blocks) != 2 {
-		return nil, fmt.Errorf("invalid call-id header: expected '<identifier>@<host>' got '%s'", str)
+		return nil, fmt.Errorf("invalid call-id header: expected '<identifier>@<host>' got '%s'", string(input))
 	}
 
 	header.Identifier = blocks[0]

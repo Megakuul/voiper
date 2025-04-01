@@ -1,8 +1,8 @@
 package wwwauthenticate
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 )
 
 type SCHEME string
@@ -16,11 +16,11 @@ const (
 // Supply multiple schemes by adding multiple headers.
 type Header struct {
 	Scheme SCHEME
-	Params map[string]string
+	Params map[string][]byte
 }
 
-func Serialize(header *Header) string {
-	b := strings.Builder{}
+func Serialize(header *Header) []byte {
+	b := bytes.Buffer{}
 
 	b.WriteString(string(header.Scheme))
 	b.WriteString(" ")
@@ -28,36 +28,36 @@ func Serialize(header *Header) string {
 	for key, value := range header.Params {
 		b.WriteString(key)
 		b.WriteString("=\"")
-		b.WriteString(value)
+		b.Write(value)
 		b.WriteString("\",")
 	}
 
-	return strings.TrimPrefix(b.String(), ",")
+	return bytes.TrimPrefix(b.Bytes(), []byte(","))
 }
 
-func Parse(str string) (*Header, error) {
+func Parse(input []byte) (*Header, error) {
 	// performs many unnecessary string reallocs, if this is bottlenecking
 	// it should be rewriten without the simple but slow string functions like TrimSpace() && SplitN().
 
 	header := &Header{
-		Params: map[string]string{},
+		Params: map[string][]byte{},
 	}
 
-	blocks := strings.SplitN(str, " ", 2)
+	blocks := bytes.SplitN(bytes.TrimSpace(input), []byte(" "), 2)
 	if len(blocks) != 2 {
-		return nil, fmt.Errorf("invalid www-authenticate header: expected '<Scheme> <key>=\"<value>\", ...' got '%s'", str)
+		return nil, fmt.Errorf("invalid www-authenticate header: expected '<Scheme> <key>=\"<value>\", ...' got '%s'", string(input))
 	}
 	header.Scheme = SCHEME(blocks[0])
 
-	params := strings.Split(blocks[1], ",")
+	params := bytes.Split(blocks[1], []byte(","))
 	for _, param := range params {
-		kv := strings.SplitN(param, "=", 2)
+		kv := bytes.SplitN(param, []byte("="), 2)
 		if len(kv) != 2 {
-			return nil, fmt.Errorf("invalid www-authenticate header param: expected '... <key>=\"<value>\", ...' got '... %s, ...'", param)
+			return nil, fmt.Errorf("invalid www-authenticate header param: expected '... <key>=\"<value>\", ...' got '... %s, ...'", string(param))
 		}
 		// trims crap from the value ('" sipsucks\""' => 'sipsucks\"')
-		header.Params[strings.TrimSpace(kv[0])] = strings.TrimSpace(strings.TrimSuffix(
-			strings.TrimPrefix(kv[1], "\""), "\"",
+		header.Params[string(bytes.TrimSpace(kv[0]))] = bytes.TrimSpace(bytes.TrimSuffix(
+			bytes.TrimPrefix(kv[1], []byte("\"")), []byte("\""),
 		))
 	}
 

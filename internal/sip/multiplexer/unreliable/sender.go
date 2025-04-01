@@ -28,6 +28,7 @@ func (m *Multiplexer) ensureSender() error {
 	if err != nil {
 		return err
 	}
+
 	ctx, cancel := context.WithCancel(m.rootCtx)
 	m.operationWg.Add(1)
 	go func() {
@@ -93,26 +94,29 @@ func (m *Multiplexer) ensureSender() error {
 				continue
 			}
 
-			viaHeader, err := via.Parse(string(viaValues[0]))
+			viaHeader, err := via.Parse(viaValues[0])
 			if err != nil {
 				m.logger.Warn(fmt.Sprintf("%v; discarding...", err))
 				continue
 			}
 
 			branch, ok := viaHeader.Params["branch"]
-			if !ok || !strings.HasPrefix(branch, via.IDIOT_SANDWICH_COOKIE) {
+			branchStr := string(branch)
+			if !ok || !strings.HasPrefix(branchStr, via.IDIOT_SANDWICH_COOKIE) {
 				m.logger.Warn("via header is missing a valid branch parameter; discarding...")
 				continue
 			}
 
 			m.transactionsLock.RLock()
-			trChan, ok := m.transactions[branch]
+			trChan, ok := m.transactions[branchStr]
 			m.transactionsLock.RUnlock()
 			if ok {
 				trChan <- res
 			}
 		}
 	}()
+
+	m.senderState = true
 
 	return nil
 }

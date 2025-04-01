@@ -3,12 +3,16 @@ package multiplexer
 import (
 	"context"
 
+	"github.com/megakuul/voiper/internal/sip/header/via"
 	"github.com/megakuul/voiper/internal/sip/request"
 	"github.com/megakuul/voiper/internal/sip/response"
 )
 
 // Multiplexer provides a generic interface for the transaction transport multiplexer.
 type Multiplexer interface {
+	// Returns the underlying protocol
+	Protocol() via.PROTOCOL
+
 	// Start a transaction identified by the specified transaction branch.
 	// Returns a channel that emits all captured responses associated with the transaction.
 	StartCall(string, *request.Request) (<-chan *response.Response, error)

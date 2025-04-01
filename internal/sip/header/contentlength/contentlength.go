@@ -1,6 +1,7 @@
 package contentlength
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 )
@@ -10,16 +11,16 @@ type Header struct {
 	Length uint32
 }
 
-func Serialize(header *Header) string {
-	return strconv.Itoa(int(header.Length))
+func Serialize(header *Header) []byte {
+	return strconv.AppendInt(nil, int64(header.Length), 10)
 }
 
-func Parse(str string) (*Header, error) {
+func Parse(input []byte) (*Header, error) {
 	header := &Header{}
 
-	length, err := strconv.ParseUint(str, 10, 32)
+	length, err := strconv.ParseUint(string(bytes.TrimSpace(input)), 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("invalid content-length header: expected uint32 length got '%s'", str)
+		return nil, fmt.Errorf("invalid content-length header: expected uint32 length got '%s'", string(input))
 	}
 	header.Length = uint32(length)
 

@@ -1,8 +1,8 @@
 package via
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 )
 
 // magic cookie specified in 3261.20.42.
@@ -23,70 +23,71 @@ const (
 // Between 'Host' and 'Port', there is no whitespace trimming. If someone puts a whitespace there,
 // I will personally revoke their license to ever touch a keyboard again.
 type Header struct {
-	Version  string
+	Version  []byte
 	Protocol PROTOCOL
-	Host     string
-	Params   map[string]string
+	Host     []byte
+	Params   map[string][]byte
 }
 
-func Serialize(header *Header) string {
-	b := strings.Builder{}
-	b.WriteString(header.Version)
+func Serialize(header *Header) []byte {
+	b := bytes.Buffer{}
+	b.Write(header.Version)
 	b.WriteString("/")
 	b.WriteString(string(header.Protocol))
 	b.WriteString(" ")
-	b.WriteString(header.Host)
+	b.Write(header.Host)
 
 	for key, value := range header.Params {
 		b.WriteString(";")
 		b.WriteString(key)
 		b.WriteString("=")
-		b.WriteString(value)
+		b.Write(value)
 	}
 
-	return b.String()
+	return b.Bytes()
 }
 
-func Parse(str string) (*Header, error) {
+func Parse(input []byte) (*Header, error) {
 	// performs many unnecessary string reallocs, if this is bottlenecking
 	// it should be rewriten without the simple but slow string functions like TrimSpace() && SplitN().
 
 	header := &Header{
-		Params: map[string]string{},
+		Params: map[string][]byte{},
 	}
 
-	block := strings.SplitN(str, "/", 3)
+	block := bytes.SplitN(bytes.TrimSpace(input), []byte("/"), 3)
 	if len(block) != 3 {
-		return nil, fmt.Errorf("invalid via header: expected 'SIP/<VERSION>/<PROTOCOL> ...' got '%s'", str)
+		return nil, fmt.Errorf("invalid via header: expected 'SIP/<VERSION>/<PROTOCOL> ...' got '%s'", string(input))
 	}
-	header.Version = strings.TrimSpace(block[0]) + "/" + strings.TrimSpace(block[1])
+	header.Version = append(bytes.TrimSpace(block[0]), byte('/'))
+	header.Version = append(header.Version, bytes.TrimSpace(block[1])...)
 
-	data := strings.SplitN(strings.TrimSpace(block[2]), " ", 2)
+	data := bytes.SplitN(bytes.TrimSpace(block[2]), []byte(" "), 2)
 	if len(data) != 2 {
-		return nil, fmt.Errorf("invalid via header: expected '.../<PROTOCOL> <host>:<port>;<params...>' got '.../%s'", block[2])
+		return nil, fmt.Errorf("invalid via header: expected '.../<PROTOCOL> <host>:<port>;<params...>' got '.../%s'", string(block[2]))
 	}
 	header.Protocol = PROTOCOL(data[0])
 
-	rhs := strings.Split(strings.TrimSpace(data[1]), ";")
+	rhs := bytes.Split(bytes.TrimSpace(data[1]), []byte(";"))
 	for i, params := range rhs {
 		if i == 0 {
-			if params == "" {
+			if len(params) == 0 {
 				return nil, fmt.Errorf(
-					"invalid via header rhs: expected '... <host>[:<port>];<params...>' got '... %s;<params...>'", params,
+					"invalid via header rhs: expected '... <host>[:<port>];<params...>' got '... %s;<params...>'", string(params),
 				)
 			}
-			header.Host = strings.TrimSpace(params)
+			header.Host = bytes.TrimSpace(params)
 			continue
 		}
 
-		kv := strings.SplitN(params, "=", 2)
+		kv := bytes.SplitN(params, []byte("="), 2)
 		if len(kv) != 2 {
 			return nil, fmt.Errorf(
-				"invalid via header param: expected ';<key>=<value>' got ';%s'", params,
+				"invalid via header param: expected ';<key>=<value>' got ';%s'", string(params),
 			)
 		}
 
-		header.Params[kv[0]] = kv[1]
+		header.Params[string(kv[0])] = kv[1]
 	}
 
 	return header, nil

@@ -33,7 +33,7 @@ func Serialize(request *Request) io.Reader {
 	for key, values := range request.Headers {
 		for _, value := range values {
 			b.WriteString(key)
-			b.WriteString(":")
+			b.WriteString(": ")
 			b.Write(value)
 			b.WriteString("\r\n")
 		}
@@ -67,7 +67,9 @@ func Peek(input io.Reader) (bool, io.Reader) {
 }
 
 func Parse(input io.Reader) (*Request, error) {
-	request := &Request{}
+	request := &Request{
+		Headers: map[string][][]byte{},
+	}
 	builder := bytes.Buffer{}
 
 	reads := 0
@@ -93,7 +95,7 @@ func Parse(input io.Reader) (*Request, error) {
 					return request, nil
 				}
 
-				line := builder.Bytes()
+				line := bytes.Clone(builder.Bytes())
 				builder.Reset()
 				if len(request.Version) == 0 {
 					blocks := bytes.SplitN(line, []byte(" "), 3)

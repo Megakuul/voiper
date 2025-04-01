@@ -86,6 +86,16 @@ func New(remoteAddr string, opts ...Option) *Multiplexer {
 	return multiplexer
 }
 
+func WithLogger(logger *slog.Logger) Option {
+	return func(m *Multiplexer) {
+		m.logger = logger
+	}
+}
+
+func (m *Multiplexer) Protocol() via.PROTOCOL {
+	return via.PROTOCOL_TCP
+}
+
 // StartCall starts a sip transaction (identified via branch) by sending the specified request to the server.
 // Returns a channel that provides all responses to the transaction.
 func (m *Multiplexer) StartCall(branch string, req *request.Request) (<-chan *response.Response, error) {
@@ -94,7 +104,10 @@ func (m *Multiplexer) StartCall(branch string, req *request.Request) (<-chan *re
 	if !m.operationState {
 		return nil, fmt.Errorf("multiplexer is already closed")
 	}
-	m.ensureSender()
+	err := m.ensureSender()
+	if err != nil {
+		return nil, err
+	}
 
 	m.transactionsLock.Lock()
 	defer m.transactionsLock.Unlock()
@@ -127,7 +140,10 @@ func (m *Multiplexer) StartListen(method string, callback func(context.Context, 
 	if !m.operationState {
 		return fmt.Errorf("multiplexer is already closed")
 	}
-	m.ensureReceiver()
+	err := m.ensureReceiver()
+	if err != nil {
+		return err
+	}
 
 	m.listenersLock.Lock()
 	defer m.listenersLock.Unlock()
@@ -182,7 +198,7 @@ func (m *Multiplexer) multiplex(ctx context.Context, conn net.Conn, responseChan
 			return fmt.Errorf("request with method '%s' is missing the 'content-length' header; aborting...", string(req.Method))
 		}
 
-		clHeader, err := contentlength.Parse(string(clValues[0]))
+		clHeader, err := contentlength.Parse(clValues[0])
 		if err != nil {
 			return fmt.Errorf("%v; aborting...", err)
 		}
@@ -225,13 +241,14 @@ func (m *Multiplexer) multiplex(ctx context.Context, conn net.Conn, responseChan
 			return fmt.Errorf("response with status '%s' is missing the 'via' header; aborting...", string(res.Status))
 		}
 
-		viaHeader, err := via.Parse(string(viaValues[0]))
+		viaHeader, err := via.Parse(viaValues[0])
 		if err != nil {
 			return fmt.Errorf("%v; aborting...", err)
 		}
 
 		branch, ok := viaHeader.Params["branch"]
-		if !ok || !strings.HasPrefix(branch, via.IDIOT_SANDWICH_COOKIE) {
+		branchStr := string(branch)
+		if !ok || !strings.HasPrefix(branchStr, via.IDIOT_SANDWICH_COOKIE) {
 			return fmt.Errorf("via header is missing a valid branch parameter; discarding...")
 		}
 
@@ -240,7 +257,7 @@ func (m *Multiplexer) multiplex(ctx context.Context, conn net.Conn, responseChan
 			return fmt.Errorf("response with status '%s' is missing the 'content-length' header; aborting...", string(res.Status))
 		}
 
-		clHeader, err := contentlength.Parse(string(clValues[0]))
+		clHeader, err := contentlength.Parse(clValues[0])
 		if err != nil {
 			return fmt.Errorf("%v; aborting...", err)
 		}
@@ -253,11 +270,12 @@ func (m *Multiplexer) multiplex(ctx context.Context, conn net.Conn, responseChan
 		res.Body = bytes.NewBuffer(buffer[:n])
 
 		m.transactionsLock.RLock()
-		trChan, ok := m.transactions[branch]
+		trChan, ok := m.transactions[branchStr]
 		m.transactionsLock.RUnlock()
 		if ok {
 			trChan <- res
 		}
+		return nil
 	}
 
 	return fmt.Errorf("encountered unknown stream data: expected request or response head")

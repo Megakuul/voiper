@@ -8,3 +8,8 @@ The following specs are explicitly disregarded because they add unnecessary comp
 
 - Support for multiple values in a single header line as specified in 3261.7.3.1. -> Each header value must be supplied in a separate header line.
 
+
+The following specs are to be implemented (if I have time):
+
+- RFC 4474 support for authentication if the server acts as UAC (e.g. when the server starts a INVITE transaction).
+- Support for Digest authentication with qop.

@@ -1,5 +1,7 @@
 package contenttype
 
+import "bytes"
+
 type CONTENT_TYPE string
 
 const (
@@ -11,12 +13,12 @@ type Header struct {
 	Type CONTENT_TYPE
 }
 
-func Serialize(header *Header) string {
-	return string(header.Type)
+func Serialize(header *Header) []byte {
+	return []byte(header.Type)
 }
 
-func Parse(str string) (*Header, error) {
+func Parse(input []byte) (*Header, error) {
 	return &Header{
-		Type: CONTENT_TYPE(str),
+		Type: CONTENT_TYPE(bytes.TrimSpace(input)),
 	}, nil
 }

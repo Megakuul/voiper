@@ -1,4 +1,4 @@
-server = "10.1.1.100:5060"
+server = "10.1.10.252:5060"
 port = 0
 username = "dagobert.duck"
 password = "1234"

@@ -1,8 +1,8 @@
 package uri
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 )
 
 // SIP uri according to RFC 3261.19.1.
@@ -11,80 +11,82 @@ import (
 // (they even say it should not be used.. IN THEIR OWN SPEC WTF?!)
 type URI struct {
 	Secure bool
-	User   string
-	Host   string
-	Params map[string]string
+	User   []byte
+	Host   []byte
+	Params map[string][]byte
 }
 
 // Serializes a sip uri (RFC 3261.19.1).
-func Serialize(uri *URI) string {
-	b := strings.Builder{}
+func Serialize(uri *URI) []byte {
+	b := bytes.Buffer{}
 	if uri.Secure {
 		b.WriteString("sips:")
 	} else {
 		b.WriteString("sip:")
 	}
 
-	b.WriteString(uri.User)
-	b.WriteString("@")
-	b.WriteString(uri.Host)
+	if len(uri.User) != 0 {
+		b.Write(uri.User)
+		b.WriteString("@")
+	}
+	b.Write(uri.Host)
 
 	for key, value := range uri.Params {
 		b.WriteString(";")
 		b.WriteString(key)
 		b.WriteString("=")
-		b.WriteString(value)
+		b.Write(value)
 	}
 
-	return b.String()
+	return b.Bytes()
 }
 
 // Parses a sip uri (RFC 3291.19.1).
-func Parse(str string) (*URI, error) {
+func Parse(input []byte) (*URI, error) {
 	// performs many unnecessary string reallocs, if this is bottlenecking
 	// it should be rewriten without the simple but slow string functions like SplitN().
 
 	uri := &URI{
-		Params: map[string]string{},
+		Params: map[string][]byte{},
 	}
 
-	blocks := strings.SplitN(str, "@", 2)
+	blocks := bytes.SplitN(input, []byte("@"), 2)
 	if len(blocks) != 2 {
-		return nil, fmt.Errorf("invalid uri: expected '@' got '%s'", str)
+		return nil, fmt.Errorf("invalid uri: expected '@' got '%s'", string(input))
 	}
 
-	lhs := strings.Split(blocks[0], ":")
+	lhs := bytes.Split(blocks[0], []byte(":"))
 	if len(lhs) < 2 {
-		return nil, fmt.Errorf("invalid uri lhs: expected '<scheme>:<user>@' got '%s@'", blocks[0])
+		return nil, fmt.Errorf("invalid uri lhs: expected '<scheme>:<user>@' got '%s@'", string(blocks[0]))
 	}
-	if lhs[0] == "sip" {
+	if bytes.Equal(lhs[0], []byte("sip")) {
 		uri.Secure = false
-	} else if lhs[0] == "sips" {
+	} else if bytes.Equal(lhs[0], []byte("sips")) {
 		uri.Secure = true
 	} else {
-		return nil, fmt.Errorf("invalid uri scheme: expected 'sip:|sips:' got '%s:'", lhs[0])
+		return nil, fmt.Errorf("invalid uri scheme: expected 'sip:|sips:' got '%s:'", string(lhs[0]))
 	}
 	uri.Host = lhs[len(lhs)-1]
 
-	rhs := strings.Split(blocks[1], ";")
+	rhs := bytes.Split(blocks[1], []byte(";"))
 	for i, param := range rhs {
 		if i == 0 {
-			if param == "" {
+			if len(param) == 0 {
 				return nil, fmt.Errorf(
-					"invalid uri rhs: expected '@<host>[:<port>]' got '@%s'", param,
+					"invalid uri rhs: expected '@<host>[:<port>]' got '@%s'", string(param),
 				)
 			}
 			uri.Host = param
 			continue
 		}
 
-		kv := strings.SplitN(param, "=", 2)
+		kv := bytes.SplitN(param, []byte("="), 2)
 		if len(kv) != 2 {
 			return nil, fmt.Errorf("invalid uri param: expected '... <key>=\"<value>\", ...' got '... %s, ...'", param)
 		}
 		// trims crap from the value (' "sipsucks\""' => 'sipsucks\"')
-		uri.Params[strings.TrimSpace(kv[0])] = strings.TrimSuffix(strings.TrimPrefix(
-			strings.TrimSpace(kv[1]), "\""), "\"",
+		uri.Params[string(bytes.TrimSpace(kv[0]))] = bytes.TrimSuffix(bytes.TrimPrefix(
+			bytes.TrimSpace(kv[1]), []byte("\"")), []byte("\""),
 		)
 	}
 

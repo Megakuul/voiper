@@ -1,8 +1,8 @@
 package from
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/megakuul/voiper/internal/sip/uri"
 )
@@ -13,63 +13,63 @@ import (
 // I don't give a shit about those formats, however parsing of all formats works expected.
 // Serialization always adds '<>' and is therefore never in addr-spec form (this avoids issues with special chars in the uri).
 type Header struct {
-	DisplayName string
+	DisplayName []byte
 	Uri         *uri.URI
-	Params      map[string]string
+	Params      map[string][]byte
 }
 
-func Serialize(header *Header) string {
-	b := strings.Builder{}
-	if header.DisplayName != "" {
+func Serialize(header *Header) []byte {
+	b := bytes.Buffer{}
+	if len(header.DisplayName) != 0 {
 		b.WriteString("\"")
-		b.WriteString(header.DisplayName)
+		b.Write(header.DisplayName)
 		b.WriteString("\" ")
 	}
 	b.WriteString("<")
-	b.WriteString(uri.Serialize(header.Uri))
+	b.Write(uri.Serialize(header.Uri))
 	b.WriteString(">")
 
 	for key, value := range header.Params {
 		b.WriteString(";")
 		b.WriteString(key)
 		b.WriteString("=")
-		b.WriteString(value)
+		b.Write(value)
 	}
 
-	return b.String()
+	return b.Bytes()
 }
 
-func Parse(str string) (*Header, error) {
+func Parse(input []byte) (*Header, error) {
 	// performs many unnecessary string reallocs, if this is bottlenecking
 	// it should be rewriten without the simple but slow string functions like TrimSpace() && SplitN().
 
 	header := &Header{
-		Params: map[string]string{},
+		Params: map[string][]byte{},
 	}
 
-	uriStr := ""
-	paramStr := ""
+	uriStr := []byte{}
+	paramStr := []byte{}
 
-	blocks := strings.SplitN(str, "<", 2)
+	blocks := bytes.SplitN(bytes.TrimSpace(input), []byte("<"), 2)
 	if len(blocks) == 2 {
 		// uri has '<>' which means there could be a DisplayName
-		header.DisplayName = strings.TrimSuffix(strings.TrimPrefix(
-			strings.TrimSpace(blocks[0]), "\""), "\"",
+		header.DisplayName = bytes.TrimSuffix(bytes.TrimPrefix(
+			bytes.TrimSpace(blocks[0]), []byte("\"")), []byte("\""),
 		)
-		data := strings.SplitN(blocks[1], ">", 2)
+		data := bytes.SplitN(blocks[1], []byte(">"), 2)
 		if len(data) != 2 {
-			return nil, fmt.Errorf("invalid from header: expected closing '>' bracket got '... <%s'", blocks[1])
+			return nil, fmt.Errorf("invalid from header: expected closing '>' bracket got '... <%s'", string(blocks[1]))
 		}
 		uriStr = data[0]
-		paramStr = strings.TrimPrefix(strings.TrimSpace(data[1]), ";")
+		paramStr = bytes.TrimPrefix(bytes.TrimSpace(data[1]), []byte(";"))
 	} else {
 		// uri has no '<>' which means there is no DisplayName
-		data := strings.SplitN(str, ";", 2)
+		data := bytes.SplitN(input, []byte(";"), 2)
 		if len(data) != 2 {
-			uriStr = str
+			uriStr = input
 		} else {
-			uriStr = strings.TrimSpace(data[0])
-			paramStr = strings.TrimSpace(data[1]) // uri params are treated as header params if there are no '<>'
+			uriStr = bytes.TrimSpace(data[0])
+			paramStr = bytes.TrimSpace(data[1]) // uri params are treated as header params if there are no '<>'
 		}
 	}
 
@@ -79,15 +79,15 @@ func Parse(str string) (*Header, error) {
 		return nil, fmt.Errorf("invalid from header uri: %w", err)
 	}
 
-	params := strings.Split(paramStr, ";")
+	params := bytes.Split(paramStr, []byte(";"))
 	for _, param := range params {
-		kv := strings.SplitN(param, "=", 2)
+		kv := bytes.SplitN(param, []byte("="), 2)
 		if len(kv) != 2 {
-			return nil, fmt.Errorf("invalid from header param: expected '... <key>=\"<value>\", ...' got '... %s, ...'", param)
+			return nil, fmt.Errorf("invalid from header param: expected '... <key>=\"<value>\", ...' got '... %s, ...'", string(param))
 		}
 		// trims crap from the value (' "sipsucks\""' => 'sipsucks\"')
-		header.Params[strings.TrimSpace(kv[0])] = strings.TrimSuffix(strings.TrimPrefix(
-			strings.TrimSpace(kv[1]), "\""), "\"",
+		header.Params[string(bytes.TrimSpace(kv[0]))] = bytes.TrimSuffix(bytes.TrimPrefix(
+			bytes.TrimSpace(kv[1]), []byte("\"")), []byte("\""),
 		)
 	}
 

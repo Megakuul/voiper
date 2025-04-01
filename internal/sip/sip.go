@@ -2,11 +2,14 @@ package sip
 
 import (
 	"context"
-	"fmt"
-	"net"
+	"log/slog"
 	"sync"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/megakuul/voiper/internal/config"
+	"github.com/megakuul/voiper/internal/sip/multiplexer/reliable"
+	"github.com/megakuul/voiper/internal/sip/transaction/register"
 )
 
 // implements some parts of the SIP protocol
@@ -42,25 +45,36 @@ func NewClient(config *config.Config, opts ...ClientOption) *Client {
 }
 
 func (c *Client) Register(ctx context.Context) error {
-	host := fmt.Sprintf("%s:%d", c.config.Server, c.config.Port)
+	mx := reliable.New(c.config.Server, reliable.WithLogger(slog.Default()))
 
-	conn, err := net.Dial("tcp", host)
-	if err != nil {
-		return err
-	}
-
-	if err != nil {
-		return err
-	}
-
-	for i := 0; i < 10; i++ {
-		buffer := make([]byte, 1024)
-		n, err := conn.Read(buffer)
-		if err != nil {
-			return err
+	statusChan := make(chan *register.Status, 100)
+	go func() {
+		for {
+			select {
+			case status := <-statusChan:
+				println(status.Message)
+			}
 		}
-		println(string(buffer[:n]))
+	}()
+
+	output, err := register.Register(ctx, mx, statusChan, &register.Input{
+		Secure:      false,
+		LocalAddr:   []byte("10.1.10.237"),
+		RemoteAddr:  []byte("10.1.10.252"),
+		DisplayName: []byte(""),
+		Username:    []byte("voiper"),
+		Password:    []byte("1234"),
+		CallID:      []byte(uuid.New().String()),
+		FromTag:     []byte(uuid.New().String()),
+		CSeq:        0,
+		ExpiresIn:   1 * time.Hour,
+	})
+	if err != nil {
+		return err
 	}
+
+	println("DONE")
+	println(output.ExpiresIn)
 
 	return nil
 }

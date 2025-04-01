@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/megakuul/voiper/internal/sip/header/via"
 	"github.com/megakuul/voiper/internal/sip/request"
 	"github.com/megakuul/voiper/internal/sip/response"
 )
@@ -83,6 +84,16 @@ func New(remoteAddr string, opts ...Option) *Multiplexer {
 	return multiplexer
 }
 
+func WithLogger(logger *slog.Logger) Option {
+	return func(m *Multiplexer) {
+		m.logger = logger
+	}
+}
+
+func (m *Multiplexer) Protocol() via.PROTOCOL {
+	return via.PROTOCOL_UDP
+}
+
 // StartCall starts a sip transaction (identified via branch) by sending the specified request to the server.
 // Returns a channel that provides all responses to the transaction.
 func (m *Multiplexer) StartCall(branch string, req *request.Request) (<-chan *response.Response, error) {
@@ -91,7 +102,10 @@ func (m *Multiplexer) StartCall(branch string, req *request.Request) (<-chan *re
 	if !m.operationState {
 		return nil, fmt.Errorf("multiplexer is already closed")
 	}
-	m.ensureSender()
+	err := m.ensureSender()
+	if err != nil {
+		return nil, err
+	}
 
 	m.transactionsLock.Lock()
 	defer m.transactionsLock.Unlock()
@@ -124,7 +138,10 @@ func (m *Multiplexer) StartListen(method string, callback func(context.Context, 
 	if !m.operationState {
 		return fmt.Errorf("multiplexer is already closed")
 	}
-	m.ensureReceiver()
+	err := m.ensureReceiver()
+	if err != nil {
+		return err
+	}
 
 	m.listenersLock.Lock()
 	defer m.listenersLock.Unlock()
