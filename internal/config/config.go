@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -21,24 +22,67 @@ const (
 	PBKDF2_ITERATIONS = 310_000
 )
 
+type FeatureCode struct{ Name, Target, Action string }
+type ICEServer struct {
+	URLs                 []string
+	Username, Credential string
+}
 type Config struct {
-	Server      string `toml:"server"`
-	Port        int    `toml:"port"`
-	Username    string `toml:"username"`
-	Password    string `toml:"password"`
-	DisplayName string `toml:"display_name"`
+	SymmetricRTP     bool          `toml:"symmetric_rtp,omitempty"`
+	DelayedOffer     bool          `toml:"delayed_offer,omitempty"`
+	ICEPolicy        string        `toml:"ice_policy,omitempty"`
+	ICEServers       []ICEServer   `toml:"ice_servers,omitempty"`
+	MaxRedirects     int           `toml:"max_redirects,omitempty"`
+	ForwardAlways    string        `toml:"forward_always,omitempty"`
+	ForwardBusy      string        `toml:"forward_busy,omitempty"`
+	ForwardNoAnswer  string        `toml:"forward_no_answer,omitempty"`
+	NoAnswerSeconds  int           `toml:"no_answer_seconds,omitempty"`
+	Features         []FeatureCode `toml:"features,omitempty"`
+	Codecs           []string      `toml:"codecs,omitempty"`
+	TLSCAFile        string        `toml:"tls_ca_file,omitempty"`
+	AutoEnable       bool          `toml:"auto_enable,omitempty"`
+	UseSecretService bool          `toml:"use_secret_service,omitempty"`
+	MediaSecurity    string        `toml:"media_security,omitempty"`
+	Server           string        `toml:"server"`
+	Port             int           `toml:"port"`
+	Username         string        `toml:"username"`
+	Password         string        `toml:"password"`
+	DisplayName      string        `toml:"display_name"`
+	Domain           string        `toml:"domain,omitempty"`
+	AuthUsername     string        `toml:"auth_username,omitempty"`
+	Transport        string        `toml:"transport,omitempty"`
+	LocalAddress     string        `toml:"local_address,omitempty"`
+	MediaAddress     string        `toml:"media_address,omitempty"`
+	OutboundProxy    string        `toml:"outbound_proxy,omitempty"`
+	PresenceMode     string        `toml:"presence_mode,omitempty"`
+	MessagingMode    string        `toml:"messaging_mode,omitempty"`
+	DTMFMode         string        `toml:"dtmf_mode,omitempty"`
+	Voicemail        string        `toml:"voicemail,omitempty"`
+}
+
+func Path(base, name string) (string, error) {
+	if name == "" || name == "." || name == ".." || filepath.Base(name) != name || strings.ContainsAny(name, "/\\\x00") {
+		return "", fmt.Errorf("invalid configuration name")
+	}
+	return filepath.Join(base, name), nil
 }
 
 // ListConfigs lists all configurations in the basePath.
 // It returns a map with [key: {configPath - extensions} value: encrypted?].
 func ListConfigs(basePath string) (map[string]bool, error) {
 	entries, err := os.ReadDir(basePath)
+	if os.IsNotExist(err) {
+		return map[string]bool{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	configs := map[string]bool{}
 	for _, entry := range entries {
+		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
 		if strings.HasSuffix(entry.Name(), CONFIG_EXTENSION+SECURE_EXTENSION) {
 			configs[strings.TrimSuffix(
 				entry.Name(), CONFIG_EXTENSION+SECURE_EXTENSION,
@@ -67,11 +111,14 @@ func LoadConfig(path, decryptionKey string) (*Config, error) {
 	}
 	defer file.Close()
 
-	rawConfig, err := io.ReadAll(file)
+	rawConfig, err := io.ReadAll(io.LimitReader(file, 1024*1024+1))
 	if err != nil {
 		return nil, err
 	}
 
+	if len(rawConfig) > 1024*1024 {
+		return nil, fmt.Errorf("configuration exceeds 1 MiB")
+	}
 	if decryptionKey != "" {
 		if len(rawConfig) < SALT_LENGTH {
 			return nil, fmt.Errorf("invalid ciphertext")
@@ -148,10 +195,14 @@ func WriteConfig(config *Config, path, encryptionKey string) error {
 		rawConfig = append(append(salt, nonce...), gcm.Seal(nil, nonce, rawConfig, nil)...)
 	}
 
-	file, err := os.Create(path)
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	file, err := os.CreateTemp(filepath.Dir(path), ".voiper-config-*")
 	if err != nil {
 		return err
 	}
+	defer os.Remove(file.Name())
 	defer file.Close()
 
 	_, err = file.Write(rawConfig)
@@ -159,7 +210,13 @@ func WriteConfig(config *Config, path, encryptionKey string) error {
 		return err
 	}
 
-	return nil
+	if err := file.Sync(); err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), path)
 }
 
 // RemoveConfig deletes a configuration from disk.

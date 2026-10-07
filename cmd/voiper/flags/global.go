@@ -14,6 +14,6 @@ func NewGlobalFlags() *GlobalFlags {
 
 func (g *GlobalFlags) Attach(flagSet *pflag.FlagSet) {
 	flagSet.StringVarP(&g.Base,
-		"base", "b", ".", "defines voiper config base path",
+		"base", "b", "", "account directory (default: XDG config directory/voiper/accounts)",
 	)
 }
