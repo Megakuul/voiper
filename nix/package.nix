@@ -72,7 +72,7 @@ let
       src = frontendSource;
       inherit pnpm;
       fetcherVersion = 4;
-      hash = "sha256-tVRktjzZsZXWHgdZt6l0XQ6N9tFdwkvyCmpkRYWZa5w=";
+      hash = "sha256-w5egfm3BdfiD2Y5cYrYFfW/+WS1cOe24nJ2llZ97lUo=";
     };
     buildPhase = ''
       runHook preBuild

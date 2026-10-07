@@ -1,5 +1,7 @@
 <script>
+  import { ui } from "../ui.js";
   import { untrack } from "svelte";
+  import Dropdown from "../components/Dropdown.svelte";
   import * as api from "../../wailsjs/go/app/App.js";
 
   let { text, onMapped, disabled = false } = $props();
@@ -91,86 +93,119 @@
   }
 </script>
 
-<fieldset disabled={busy || disabled}>
-  <legend>CSV column mapping</legend>
-  <p class="muted small">
+<fieldset
+  class="min-w-0 rounded-lg border border-[var(--border,#64748b)] p-4 m-0"
+  disabled={busy || disabled}
+>
+  <legend class="font-semibold mb-4">CSV column mapping</legend>
+  <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
     Use a comma-separated CSV with a header row. Choose which columns contain
     names, numbers and notes. Mapping keeps one contact per source row.
   </p>
-  {#if busy}<p role="status">Processing CSV…</p>{/if}
-  {#if error}<p class="error" role="alert">{error}</p>{/if}
-  {#if notice}<p role="status">{notice}</p>{/if}
+  {#if busy}<p class="m-0 leading-[1.6]" role="status">Processing CSV…</p>{/if}
+  {#if error}<p class="m-0 leading-[1.6]" role="alert">{error}</p>{/if}
+  {#if notice}<p class="m-0 leading-[1.6]" role="status">{notice}</p>{/if}
   {#if columns.length}
-    <div class="fields">
-      <label>
+    <div
+      class="fields mb-3 grid grid-cols-[repeat(auto-fit,minmax(min(12rem,100%),1fr))] items-end gap-3"
+    >
+      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
         Name or first name
-        <select bind:value={mapping.Name} onchange={invalidate}>
-          <option value="">No name column</option>
-          {#each columns as column}<option value={column}>{column}</option
-            >{/each}
-        </select>
+        <Dropdown
+          label="Name or first name"
+          bind:value={mapping.Name}
+          disabled={busy || disabled}
+          onchange={invalidate}
+          options={[
+            { value: "", label: "No name column" },
+            ...columns.map((column) => ({ value: column, label: column })),
+          ]}
+        />
       </label>
-      <label>
+      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
         Last name to append
-        <select bind:value={mapping.AdditionalName} onchange={invalidate}>
-          <option value="">None</option>
-          {#each columns as column}<option value={column}>{column}</option
-            >{/each}
-        </select>
+        <Dropdown
+          label="Last name to append"
+          bind:value={mapping.AdditionalName}
+          disabled={busy || disabled}
+          onchange={invalidate}
+          options={[
+            { value: "", label: "None" },
+            ...columns.map((column) => ({ value: column, label: column })),
+          ]}
+        />
       </label>
-      <label>
+      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
         Preferred primary number
-        <select bind:value={mapping.Address} onchange={invalidate}>
-          <option value="">Use the first additional number</option>
-          {#each columns as column}<option value={column}>{column}</option
-            >{/each}
-        </select>
+        <Dropdown
+          label="Preferred primary number"
+          bind:value={mapping.Address}
+          disabled={busy || disabled}
+          onchange={invalidate}
+          options={[
+            { value: "", label: "Use the first additional number" },
+            ...columns.map((column) => ({ value: column, label: column })),
+          ]}
+        />
       </label>
-      <label>
+      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
         Notes
-        <select bind:value={mapping.Notes} onchange={invalidate}>
-          <option value="">None</option>
-          {#each columns as column}<option value={column}>{column}</option
-            >{/each}
-        </select>
+        <Dropdown
+          label="Notes"
+          bind:value={mapping.Notes}
+          disabled={busy || disabled}
+          onchange={invalidate}
+          options={[
+            { value: "", label: "None" },
+            ...columns.map((column) => ({ value: column, label: column })),
+          ]}
+        />
       </label>
     </div>
     {#each mapping.Numbers as number, index}
-      <div class="number">
-        <label>
+      <div
+        class="number mb-3 grid grid-cols-[repeat(auto-fit,minmax(min(12rem,100%),1fr))] items-end gap-3"
+      >
+        <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
           Additional number {index + 1}
-          <select bind:value={number.Column} onchange={invalidate}>
-            <option value="">Choose a column</option>
-            {#each columns as column}<option value={column}>{column}</option
-              >{/each}
-          </select>
+          <Dropdown
+            label={`Additional number ${index + 1}`}
+            bind:value={number.Column}
+            disabled={busy || disabled}
+            onchange={invalidate}
+            options={[
+              { value: "", label: "Choose a column" },
+              ...columns.map((column) => ({ value: column, label: column })),
+            ]}
+          />
         </label>
-        <label>
+        <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
           Label
           <input
+            class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
             bind:value={number.Label}
             oninput={invalidate}
             maxlength="80"
             placeholder="Work, mobile, home…"
           />
         </label>
-        <button type="button" onclick={() => removeNumber(index)}>
+        <button class={ui.button} type="button" onclick={() => removeNumber(index)}>
           Remove number {index + 1}
         </button>
       </div>
     {/each}
-    <p class="muted small">
+    <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
       The first nonempty number becomes primary. Empty and repeated numbers are
       skipped; rows with no number appear as errors in the preview. Labels apply
       to additional numbers. Missing names use the primary number.
     </p>
-    <div class="actions">
-      <button
+    <div class="actions flex flex-wrap gap-2">
+      <button class={ui.button}
         type="button"
         disabled={mapping.Numbers.length >= 20}
         onclick={addNumber}>Add number column</button
       >
-      <button
+      <button class={ui.button}
         type="button"
         disabled={!mapping.Address &&
           !mapping.Numbers.some((number) => number.Column)}
@@ -179,36 +214,3 @@
     </div>
   {/if}
 </fieldset>
-
-<style>
-  fieldset {
-    min-width: 0;
-    border: 1px solid var(--border, #64748b);
-    border-radius: 0.5rem;
-    padding: 1rem;
-  }
-  .fields,
-  .number {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-    align-items: end;
-  }
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    min-width: 0;
-  }
-  select,
-  input {
-    width: 100%;
-    min-width: 0;
-  }
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-</style>

@@ -129,6 +129,8 @@ export function RestoreDirectoryContact(arg1:number):Promise<void>;
 
 export function RetryAudio(arg1:string):Promise<void>;
 
+export function RetryRegistration(arg1:string):Promise<void>;
+
 export function SaveContact(arg1:store.Contact):Promise<void>;
 
 export function SaveDirectoryProfile(arg1:store.DirectoryProfile,arg2:string):Promise<void>;

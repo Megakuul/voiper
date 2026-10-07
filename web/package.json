@@ -18,5 +18,8 @@
   "packageManager": "pnpm@12.9.0",
   "engines": {
     "node": ">=24.21.0 <25"
+  },
+  "dependencies": {
+    "bits-ui": "2.19.5"
   }
 }

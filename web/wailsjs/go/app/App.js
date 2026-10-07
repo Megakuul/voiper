@@ -242,6 +242,10 @@ export function RetryAudio(arg1) {
   return window['go']['app']['App']['RetryAudio'](arg1);
 }
 
+export function RetryRegistration(arg1) {
+  return window['go']['app']['App']['RetryRegistration'](arg1);
+}
+
 export function SaveContact(arg1) {
   return window['go']['app']['App']['SaveContact'](arg1);
 }

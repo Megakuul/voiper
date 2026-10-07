@@ -113,6 +113,16 @@ func TestRecoveryAfterInitialRegistrationFailure(t *testing.T) {
 			} else if manager.Snapshot().Accounts[0].State != "failed" {
 				t.Fatal("authentication failure retried without explicit user action")
 			}
+			if err := manager.RetryRegistration("office"); err != nil {
+				t.Fatal(err)
+			}
+			waitRegistrationState(t, manager, changed, "registered")
+			if err := manager.RetryRegistration("office"); err != nil {
+				t.Fatalf("refresh registered account: %v", err)
+			}
+			if err := manager.RetryRegistration("missing"); err == nil {
+				t.Fatal("retry accepted disabled account")
+			}
 		})
 	}
 }

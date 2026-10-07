@@ -11,6 +11,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -89,8 +90,10 @@ func (r *RootOptions) Run() error {
 				runtime.WindowShow(ctx)
 			}
 		}},
-		MinWidth:  640,
-		MinHeight: 480,
+		// Wails otherwise disables Linux compositing, making scrolling CPU-bound.
+		Linux:     &linux.Options{WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand},
+		MinWidth:  480,
+		MinHeight: 400,
 		Bind: []interface{}{
 			app,
 		},

@@ -46,7 +46,7 @@ func (m *Manager) Suspend() {
 	}
 	m.notify()
 }
-func (m *Manager) registerAccount(a *account) {
+func (m *Manager) registerAccount(a *account) error {
 	err := a.client.Register(a.ctx)
 	m.mu.Lock()
 	a.registrationError = err
@@ -62,6 +62,35 @@ func (m *Manager) registerAccount(a *account) {
 		}
 	}
 	m.notify()
+	return err
+}
+
+// RetryRegistration reuses the account and its dialogs; enabling it again would end calls.
+func (m *Manager) RetryRegistration(name string) error {
+	if !m.recovery.TryLock() {
+		return errors.New("registration recovery is already in progress")
+	}
+	defer m.recovery.Unlock()
+	m.mu.Lock()
+	a := m.accounts[name]
+	m.mu.Unlock()
+	if a == nil {
+		return errors.New("account is not enabled")
+	}
+	select {
+	case <-a.registrationDone:
+	default:
+		return errors.New("registration is already in progress")
+	}
+	m.mu.Lock()
+	initialError := a.registrationError
+	m.mu.Unlock()
+	if initialError != nil {
+		return m.registerAccount(a)
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	return a.client.RefreshRegistration(ctx)
 }
 
 func (m *Manager) RecoverRegistrations() {

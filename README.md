@@ -30,6 +30,38 @@ The flake pins Go 1.27.1, Node 24.21.0, pnpm 12.9.0 and Wails 2.16.0.
 The frontend uses Svelte 5 and Vite 8. The package builds frontend assets offline
 from the lockfile, then builds Go with GTK3, WebKitGTK 4.1, libopus, SpeexDSP and libsecret.
 
+## Desktop rendering troubleshooting
+
+The browser opened during development and the Linux desktop window use different
+renderers: the desktop uses WebKitGTK. If hover effects or menus flicker only in
+the desktop window, fully quit the app and compare the same binary with:
+
+```sh
+WEBKIT_DISABLE_DMABUF_RENDERER=1 ./result/bin/voiper
+```
+
+This isolates WebKit's DMA-BUF rendering path without changing the UI. If it still
+flickers, quit again and try disabling compositing for comparison:
+
+```sh
+WEBKIT_DISABLE_COMPOSITING_MODE=1 ./result/bin/voiper
+```
+
+These are diagnostic overrides, not application defaults. Disabling compositing
+can increase CPU usage and slow scrolling. Record which command helps, the GPU
+and driver, and whether the session uses Wayland or X11 before choosing a lasting
+workaround. For development, prefix `make dev-voiper` with the same variable.
+Software-rendered Xvfb checks do not validate the desktop GPU rendering path.
+
+## Frontend styling
+
+The UI uses Tailwind 4 utilities in Svelte components. Shared control class lists
+live in `web/src/ui.js`; theme colors and shadows are defined in `web/src/app.css`.
+Keep new layout, spacing, responsive behavior and interaction states in utilities.
+CSS is reserved for the global theme, browser-specific control drawing and
+animation keyframes. Keep complete utility names in source so Tailwind can find them.
+Run `pnpm --dir web build` inside `nix develop` after frontend changes.
+
 ## First call
 
 1. In **Accounts**, create an account with your server, username and password.
@@ -147,6 +179,25 @@ It receives `userstatus` in the `http://sip.lanphone.de/presence/` namespace via
 ordinary SIP presence subscriptions and maps available, offline, in-call, away
 and DND. Auto mode understands these payloads without adding vendor code to
 `pkg/sip`. Server banners are capability hints, not proof of interoperability.
+
+To see contact status, select your outgoing account, then click **Watch status**
+next to a contact in **Contacts**. The received state, note and
+source appear below the contact; `swyx-classic` identifies a Swyx status payload.
+Configure the provider under **Accounts → Edit → Provider compatibility and
+voicemail → Presence** (Automatic or Swyx for this adapter).
+
+To publish your own standard SIP availability, open **Your status & voicemail**
+in **Overview** or **Phone**, enter a status message and select **Set available**
+or **Set unavailable**. These controls do **not** set Swyx-specific custom statuses.
+The app's **Do not disturb** switch controls local incoming-call handling separately.
+
+The left navigation collapses to icons in smaller windows. **Overview** combines
+the dialer and active calls with a short recent-people list. Selecting a recent
+person fills the number and outgoing account; press **Call** to dial. The full
+phonebook, search and presence watches remain in **Contacts**.
+
+Connection details, logs and diagnostic export are available from the three
+icons at the bottom right. The live panel closes with its close button or Escape.
 
 Choose Standard, Dialog/busy-lamp, Swyx or Disabled per account and use **Watch
 status** on a contact; **Stop watching** removes the watch. Status publication

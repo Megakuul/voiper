@@ -1,5 +1,7 @@
 <script>
+  import { ui } from "../ui.js";
   import { onMount } from "svelte";
+  import Dropdown from "../components/Dropdown.svelte";
   import * as api from "../../wailsjs/go/app/App.js";
   import { EventsOn } from "../../wailsjs/runtime/runtime.js";
 
@@ -70,25 +72,25 @@
   });
 </script>
 
-<details>
-  <summary>Company directory</summary>
-  <p class="muted small">
+<details class={[ui.details, "mt-[1.3rem] border-t border-t-border pt-4"]}>
+  <summary class={[ui.summary, "px-0 py-1"]}>Company directory</summary>
+  <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
     Use your administrator-provided LDAP endpoint. Connections require StartTLS
     or LDAPS with a trusted certificate. Cached contacts remain available
     offline.
   </p>
-  {#if error}<p class="error" role="alert">{error}</p>{/if}
-  {#if notice}<p role="status">{notice}</p>{/if}
-  <fieldset disabled={busy}>
-    <details>
-      <summary>Find advertised directory servers</summary>
-      <label
-        >Company DNS domain<input
+  {#if error}<p class="m-0 leading-[1.6]" role="alert">{error}</p>{/if}
+  {#if notice}<p class="m-0 leading-[1.6]" role="status">{notice}</p>{/if}
+  <fieldset class="p-0 m-0 min-w-0 border-0" disabled={busy}>
+    <details class={[ui.details, "mt-[1.3rem] border-t border-t-border pt-4"]}>
+      <summary class={[ui.summary, "px-0 py-1"]}>Find advertised directory servers</summary>
+      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+        >Company DNS domain<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
           placeholder="example.org"
           bind:value={discoveryDomain}
         /></label
       >
-      <button
+      <button class={ui.button}
         type="button"
         disabled={busy || !discoveryDomain}
         onclick={() =>
@@ -99,7 +101,7 @@
                 "No LDAP service is advertised for this domain. Enter the administrator-provided endpoint below.";
           })}>Find servers</button
       >
-      {#each servers as server}<button
+      {#each servers as server}<button class={ui.button}
           type="button"
           onclick={() => {
             profile.URL = server;
@@ -108,14 +110,14 @@
             result = null;
           }}>{server}</button
         >{/each}
-      <p class="muted small">
+      <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
         Uses DNS service records. Selecting a result does not sign in; LDAP
         connections still require verified StartTLS. This does not assume the
         SIP server also hosts your directory.
       </p>
     </details>
     <form
-      class="stack"
+      class="stack flex flex-col gap-4"
       oninput={() => {
         result = null;
       }}
@@ -131,14 +133,14 @@
         });
       }}
     >
-      <label
-        >Directory URL<input
+      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+        >Directory URL<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
           required
           placeholder="ldaps://directory.example.org"
           bind:value={profile.URL}
         /></label
       >
-      <button
+      <button class={ui.button}
         type="button"
         disabled={busy || !profile.URL}
         onclick={() =>
@@ -150,67 +152,74 @@
                 "The server did not advertise directory bases. Ask your administrator for the base DN.";
           })}>Find directory bases</button
       >
-      {#if bases.length}<label
-          >Available bases<select
-            onchange={(e) => (profile.BaseDN = e.currentTarget.value)}
-            ><option value="">Select a base</option>{#each bases as base}<option
-                value={base}>{base}</option
-              >{/each}</select
-          ></label
+      {#if bases.length}<label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+          >Available bases<Dropdown
+            label="Available bases"
+            value={bases.includes(profile.BaseDN) ? profile.BaseDN : ""}
+            disabled={busy}
+            options={[
+              { value: "", label: "Select a base" },
+              ...bases.map((base) => ({ value: base, label: base })),
+            ]}
+            onchange={(value) => {
+              profile.BaseDN = value;
+              result = null;
+            }}
+          /></label
         >{/if}
-      <label
-        >Base DN<input
+      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+        >Base DN<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
           required
           placeholder="dc=example,dc=org"
           bind:value={profile.BaseDN}
         /></label
       >
-      <label>Bind DN (optional)<input bind:value={profile.BindDN} /></label>
-      <label
-        >Additional CA certificate file (optional)<input
+      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]">Bind DN (optional)<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]} bind:value={profile.BindDN} /></label>
+      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+        >Additional CA certificate file (optional)<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
           placeholder="System trust by default"
           bind:value={profile.CAFile}
         /></label
       >
-      <label
-        >Password<input
+      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+        >Password<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
           type="password"
           autocomplete="off"
           bind:value={password}
         /></label
       >
-      <label class="toggle"
-        ><input type="checkbox" bind:checked={profile.UseSecretService} /> Save password
+      <label class="flex flex-row gap-[0.65rem] text-[0.9rem] text-[#c8cdd5] items-center min-h-[32px] cursor-pointer"
+        ><input class={ui.checkbox} type="checkbox" bind:checked={profile.UseSecretService} /> Save password
         in the desktop wallet</label
       >
-      <p class="muted small">
+      <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
         Leave an existing password empty to keep it. Without the wallet, enter
         the password again after restarting Voiper. LDAP credentials may differ
         from SIP credentials.
       </p>
-      <label
-        >Maximum entries<input
+      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+        >Maximum entries<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
           type="number"
           min="1"
           max="5000"
           bind:value={profile.Limit}
         /></label
       >
-      <label class="toggle"
-        ><input type="checkbox" bind:checked={profile.Enabled} /> Keep directory contacts
+      <label class="flex flex-row gap-[0.65rem] text-[0.9rem] text-[#c8cdd5] items-center min-h-[32px] cursor-pointer"
+        ><input class={ui.checkbox} type="checkbox" bind:checked={profile.Enabled} /> Keep directory contacts
         synchronized</label
       >
-      <label
-        >Refresh every (minutes)<input
+      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+        >Refresh every (minutes)<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
           type="number"
           min="5"
           max="1440"
           bind:value={profile.IntervalMinutes}
         /></label
       >
-      <button disabled={busy}>Save directory</button>
-      <div class="row">
-        <button
+      <button class={ui.button} disabled={busy}>Save directory</button>
+      <div class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]">
+        <button class={ui.button}
           type="button"
           disabled={busy}
           onclick={() =>
@@ -218,7 +227,7 @@
               result = await api.LookupDirectory(config());
             })}>Preview contacts</button
         >
-        <button
+        <button class={ui.button}
           type="button"
           disabled={busy || running || !profile.Enabled}
           onclick={() =>
@@ -227,7 +236,7 @@
               await load();
             })}>{running ? "Refreshing…" : "Refresh saved directory"}</button
         >
-        <button
+        <button class={ui.button}
           type="button"
           disabled={busy}
           onclick={() =>
@@ -240,31 +249,31 @@
       </div>
     </form>
   </fieldset>
-  <p class="muted small" aria-live="polite">
+  <p class="m-0 leading-[1.6] text-muted text-[0.78rem]" aria-live="polite">
     Last successful refresh: {date(status.LastSuccess)}. {status.Entries || 0} directory
     entries; {status.Preserved || 0} local edits, duplicates or hidden contacts preserved.{status.Partial
       ? " The last scan was partial; missing contacts were kept."
       : ""}
   </p>
-  {#if status.Error}<p role="status">{status.Error}</p>{/if}
-  <p class="muted small">
+  {#if status.Error}<p class="m-0 leading-[1.6]" role="status">{status.Error}</p>{/if}
+  <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
     Editing a synchronized contact keeps a local copy. Deleting it hides it from
     later refreshes. Only a complete scan can remove contacts that disappeared
     from the directory. Changing servers preserves the old phonebook as an
     imported snapshot.
   </p>
   {#if result}
-    <p>
+    <p class="m-0 leading-[1.6]">
       {result.Contacts.length} entries · {result.Skipped} skipped{result.Truncated
         ? " · limit reached"
         : ""}
     </p>
-    <div class="preview">
-      {#each result.Contacts.slice(0, 20) as entry}<p>
+    <div class="p-4 whitespace-pre-wrap wrap-anywhere max-h-[180px] overflow-auto text-xs bg-[#1c252e] rounded-[6px]">
+      {#each result.Contacts.slice(0, 20) as entry}<p class="m-0 leading-[1.6]">
           {entry.Name} · {entry.Address}
         </p>{/each}
     </div>
-    <button
+    <button class={ui.button}
       disabled={busy}
       onclick={() =>
         run(async () => {

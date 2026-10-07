@@ -248,6 +248,12 @@ func (a *App) EnableConfig(name, key string) error {
 	}
 	return a.phone.Enable(name, *cfg)
 }
+func (a *App) RetryRegistration(name string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.phone.RetryRegistration(name)
+}
 func (a *App) DisableConfig(name string) error {
 	if err := a.ready(); err != nil {
 		return err
