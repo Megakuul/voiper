@@ -2,6 +2,8 @@
   lib,
   stdenvNoCC,
   buildGoModule,
+  go,
+  go-licenses,
   nodejs,
   pnpm,
   fetchPnpmDeps,
@@ -24,6 +26,14 @@
 }:
 let
   version = "0.1.0";
+  goTags = [
+    "desktop"
+    "production"
+    "webkit2_41"
+    "opus"
+    "speex"
+    "secretservice"
+  ];
   source = lib.fileset.toSource {
     root = ../.;
     fileset = lib.fileset.unions [
@@ -82,10 +92,8 @@ let
     installPhase = ''
       runHook preInstall
       cp -r dist $out
-      mkdir -p $licenses
-      while IFS= read -r -d "" notice; do
-        install -Dm644 "$notice" "$licenses/''${notice#node_modules/.pnpm/}"
-      done < <(find node_modules/.pnpm -type f \( -iname 'LICENSE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' \) -print0)
+      pnpm licenses list --json > licenses-report.json
+      node ${./frontend-licenses.mjs} licenses-report.json $licenses
       runHook postInstall
     '';
   };
@@ -96,6 +104,7 @@ buildGoModule {
   src = source;
   vendorHash = "sha256-Fx6mcfAGJeUqVNkL8SXzRJBnKnLJsyjhlg0pVxFfcqY=";
   nativeBuildInputs = [
+    go-licenses
     pkg-config
     dbus
     wrapGAppsHook3
@@ -116,14 +125,7 @@ buildGoModule {
     CGO_ENABLED = "1";
     GOTOOLCHAIN = "local";
   };
-  tags = [
-    "desktop"
-    "production"
-    "webkit2_41"
-    "opus"
-    "speex"
-    "secretservice"
-  ];
+  tags = goTags;
   nativeCheckInputs = [ sipp ];
   subPackages = [ "cmd/voiper" ];
   ldflags = [
@@ -162,12 +164,20 @@ buildGoModule {
   ];
   postInstall = ''
     install -Dm644 build/package/appicon.png $out/share/pixmaps/voiper.png
-    install -Dm644 LICENSE $out/share/licenses/voiper/LICENSE
-    while IFS= read -r -d "" notice; do
-      install -Dm644 "$notice" "$out/share/doc/voiper/third-party/''${notice#vendor/}"
-    done < <(find vendor -type f \( -iname 'LICENSE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' \) -print0)
-    install -Dm644 vendor/github.com/gotranspile/g722/README.md $out/share/doc/voiper/third-party/github.com/gotranspile/g722/README.md
-    cp -r ${frontend.licenses} $out/share/doc/voiper/third-party/frontend
+    licenses=$out/share/licenses/voiper
+    install -Dm644 LICENSE $licenses/LICENSE
+    # go-licenses follows the packages actually linked into the binary.
+    # g722 states its license only in its README, which is shipped instead.
+    export GOFLAGS="$GOFLAGS -tags=${lib.concatStringsSep "," goTags}"
+    goLicenseFlags="--ignore github.com/megakuul/voiper --ignore github.com/gotranspile/g722"
+    go-licenses save ./cmd/voiper --save_path=$licenses/go $goLicenseFlags
+    go-licenses report ./cmd/voiper $goLicenseFlags > $licenses/go/licenses.csv
+    install -Dm644 vendor/github.com/gotranspile/g722/README.md $licenses/go/github.com/gotranspile/g722/README.md
+    # The Go runtime and standard library are linked statically.
+    # The nixpkgs Go install omits its license, so take it from the source archive.
+    mkdir -p $licenses/go/go-stdlib
+    tar -xzOf ${go.src} go/LICENSE > $licenses/go/go-stdlib/LICENSE
+    cp -r ${frontend.licenses} $licenses/frontend
   '';
   preFixup = ''
     gappsWrapperArgs+=(--prefix LD_LIBRARY_PATH : "${

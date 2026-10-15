@@ -152,40 +152,30 @@
   });
 </script>
 
-<div class="
-  grid grid-cols-[minmax(230px,_0.8fr)_minmax(0,_2fr)] gap-4 max-[850px]:grid-cols-[1fr]
-  [&_>_*]:min-w-0 [&_>_.chat]:max-w-none
-">
-  <section class="
-    panel p-6 bg-surface shadow-panel border-t-[#526271] border-r-border border-b-border border-l-border
-    rounded-[6px] min-w-0 flex flex-col gap-[0.8rem] border max-[700px]:p-[1.15rem]
-    max-[850px]:max-h-[280px] max-[850px]:overflow-auto [&_>_p]:mb-4 [&_>_button_+_button]:mt-4
-    [&_form_+_details_button]:mt-2 [&_form_+_details_button]:mr-2 [&_form_+_details_button]:mb-0
-    [&_form_+_details_button]:ml-0 [&_>_h2:first-child]:pb-4 [&_>_h2:first-child]:border-b
-    [&_>_h2:first-child]:border-b-border [&_>_.row_+_.row]:mt-4
-  ">
+<div class="grid grid-cols-[minmax(230px,_0.8fr)_minmax(0,_2fr)] gap-4 max-[850px]:grid-cols-[1fr] *:min-w-0">
+  <section class={[ui.panel, "flex flex-col gap-[0.8rem] max-[850px]:max-h-[280px] max-[850px]:overflow-auto"]}>
     <h2 class={ui.h2}>Conversations</h2>
     <form
-      class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]"
+      class={ui.row}
       onsubmit={(e) => {
         e.preventDefault();
         run(refresh);
       }}
     >
-      <input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <input class={ui.field}
         aria-label="Search conversations"
         placeholder="Search conversations"
         bind:value={search}
       /><button class={ui.button}>Search</button>
     </form>
     <form
-      class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]"
+      class={ui.row}
       onsubmit={(e) => {
         e.preventDefault();
         run(() => openConversation(target));
       }}
     >
-      <input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <input class={ui.field}
         required
         aria-label="New conversation recipient"
         placeholder="Extension or SIP address"
@@ -193,35 +183,19 @@
       /><button class={ui.button} disabled={!account}>New</button>
     </form>
     {#each conversations as c}<button
-        class={[ui.control, `
-          px-4 py-[0.65rem] rounded-[6px] bg-[#35424e] text-inherit min-h-[38px] shadow-control font-medium
-          text-left flex flex-col gap-[0.3rem] w-full wrap-anywhere border border-[#536271]
-          [&.active]:text-accent-text [&.active]:border-accent [&_strong]:flex [&_strong]:justify-between
-          [&:hover:not(:disabled)]:bg-[#435362] [&:hover:not(:disabled)]:border-[#727e8d]
-        `]}
-        class:active={selected === c.Remote}
+        class={[ui.button, "flex w-full flex-col gap-[0.3rem] text-left wrap-anywhere", selected === c.Remote && "text-accent-text border-accent"]}
         onclick={() => run(() => openConversation(c.Remote))}
-        ><strong
-          >{c.Remote}{#if c.Unread}<span class="badge px-[0.7rem] py-[0.3rem] rounded-[4px] bg-[#435362] text-xs ml-auto">{c.Unread}</span
+        ><strong class="flex justify-between"
+          >{c.Remote}{#if c.Unread}<span class={[ui.badge, "ml-auto"]}>{c.Unread}</span
             >{/if}</strong
         ><span class="text-muted text-[0.78rem]">{c.Preview}</span><span class="text-muted text-[0.78rem]"
           >{new Date(c.Updated).toLocaleString()}</span
         ></button
-      >{:else}<p class="px-0 py-8 m-0 leading-[1.6] text-muted text-center">No conversations yet.</p>{/each}
+      >{:else}<p class={ui.empty}>No conversations yet.</p>{/each}
   </section>
-  <section class="
-    panel chat p-6 bg-surface shadow-panel border-t-[#526271] border-r-border border-b-border
-    border-l-border rounded-[6px] min-w-0 max-w-[850px] border max-[700px]:p-[1.15rem] [&_>_p]:my-4
-    [&_>_button_+_button]:mt-4 [&_form_+_details_button]:mt-2 [&_form_+_details_button]:mr-2
-    [&_form_+_details_button]:mb-0 [&_form_+_details_button]:ml-0 [&_>_.quiet]:mt-4
-    [&_>_h2:first-child]:pb-4 [&_>_h2:first-child]:border-b [&_>_h2:first-child]:border-b-border
-    [&_>_.row_+_.row]:mt-4
-  ">
+  <section class={[ui.card, "[&>p]:my-4 [&>.quiet]:mt-4"]}>
     {#if selected}
-      <div class="
-        row flex items-center gap-[0.7rem] justify-between max-[700px]:flex-wrap [&_>_button]:shrink-0
-        max-[700px]:[&_>_.grow]:basis-[180px]
-      ">
+      <div class={[ui.row, "justify-between"]}>
         <h2 class={ui.h2}>{selected}</h2>
         <button class={ui.button} disabled={busy} onclick={() => onDial(selected)}
           >Open dialer</button
@@ -233,13 +207,9 @@
           >Delete conversation</button
         >
       </div>
-      {#if confirmDelete}<div class="
-        px-4 py-3 bg-accent-surface rounded-[6px] flex justify-between items-center mb-4 border
-        border-brand-border [&_button]:px-2 [&_button]:py-[0.2rem] [&_button]:bg-transparent
-        [&_button]:border-0
-      ">
-          <span>Delete this conversation from this device?</span><button
-            class={[ui.dangerButton, "danger"]}
+      {#if confirmDelete}<div class="flex flex-wrap items-center gap-2 mt-4 mb-4 px-4 py-3 rounded-[6px] border border-brand-border bg-accent-surface">
+          <span class="mr-auto">Delete this conversation from this device?</span><button
+            class={ui.dangerButton}
             onclick={() =>
               run(async () => {
                 const deletingAccount = account,
@@ -261,7 +231,7 @@
           ><button class={ui.button} onclick={() => (confirmDelete = false)}>Cancel</button>
         </div>{/if}
       <form
-        class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]"
+        class={ui.row}
         onsubmit={(e) => {
           e.preventDefault();
           viewRevision++;
@@ -270,23 +240,18 @@
           run(refresh);
         }}
       >
-        <input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+        <input class={ui.field}
           aria-label="Search messages"
           placeholder="Search this conversation"
           bind:value={messageSearch}
         /><button class={ui.button}>Search</button>
       </form>
-      <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+      <p class={ui.hint}>
         SIP text messaging. Server acceptance does not establish delivery or
         read status.
       </p>
       <div
-        class="
-          px-0 py-4 flex flex-col gap-4 min-h-[180px] max-h-[50vh] overflow-auto [&_article]:p-4
-          [&_article]:self-start [&_article]:max-w-[85%] [&_article]:bg-[#303d49] [&_article]:rounded-[6px]
-          [&_article_p]:whitespace-pre-wrap [&_article_p]:wrap-anywhere [&_article.outgoing]:self-end
-          [&_article.outgoing]:bg-accent-surface
-        "
+        class="flex flex-col gap-4 min-h-[180px] max-h-[50vh] overflow-auto py-4"
         bind:this={thread}
         aria-label="Conversation messages"
       >
@@ -294,29 +259,29 @@
             >Load earlier messages</button
           >{/if}
         {#each messages as m (m.ID)}<article
-            class:outgoing={m.Direction === "outgoing"}
+            class={["max-w-[85%] p-4 rounded-[6px]", m.Direction === "outgoing" ? "self-end bg-accent-surface" : "self-start bg-[#303d49]"]}
           >
             <strong>{m.Direction === "outgoing" ? "You" : m.Remote}</strong>
-            <p class="m-0 leading-[1.6]">{m.Body}</p>
+            <p class={[ui.text, "whitespace-pre-wrap wrap-anywhere"]}>{m.Body}</p>
             <span class="text-muted text-[0.78rem]"
               >{m.Status} · {new Date(m.Created).toLocaleString()}</span
             >{#if m.Status === "failed"}<button class={ui.button} onclick={() => (draft = m.Body)}
                 >Copy to composer</button
               >{/if}
-          </article>{:else}<p class="px-0 py-8 m-0 leading-[1.6] text-muted text-center">
+          </article>{:else}<p class={ui.empty}>
             No messages match this view.
           </p>{/each}
       </div>
       <form
-        class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]"
+        class={ui.row}
         onsubmit={(e) => {
           e.preventDefault();
           run(send);
         }}
       >
         <textarea class="
-          px-[0.8rem] py-[0.65rem] outline-offset-3 min-w-0 w-full min-h-[90px] rounded-[6px] bg-[#1c252e]
-          text-[#eef0f3] resize-y border border-[#4b5a68] placeholder:text-[#858d99] focus:outline-2
+          px-[0.8rem] py-[0.65rem] outline-offset-3 min-w-0 w-full min-h-[90px] rounded-[6px] bg-field
+          text-foreground resize-y border border-field-border placeholder:text-[#858d99] focus:outline-2
           focus:outline-solid focus:outline-accent focus:border-transparent
         "
           required
@@ -330,11 +295,11 @@
               if (!busy) run(send);
             }
           }}></textarea><button
-          class={[ui.primaryButton, "primary"]}
+          class={ui.primaryButton}
           disabled={busy || !account || !draft.trim()}>Send</button
         >
       </form>
-    {:else}<p class="px-0 py-8 m-0 leading-[1.6] text-muted text-center">
+    {:else}<p class={ui.empty}>
         Select a conversation or enter a recipient to start one.
       </p>{/if}
   </section>

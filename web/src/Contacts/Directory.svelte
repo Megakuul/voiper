@@ -72,20 +72,20 @@
   });
 </script>
 
-<details class={[ui.details, "mt-[1.3rem] border-t border-t-border pt-4"]}>
-  <summary class={[ui.summary, "px-0 py-1"]}>Company directory</summary>
-  <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+<details class={[ui.details, ui.section]}>
+  <summary class={ui.summary}>Company directory</summary>
+  <p class={ui.hint}>
     Use your administrator-provided LDAP endpoint. Connections require StartTLS
     or LDAPS with a trusted certificate. Cached contacts remain available
     offline.
   </p>
-  {#if error}<p class="m-0 leading-[1.6]" role="alert">{error}</p>{/if}
-  {#if notice}<p class="m-0 leading-[1.6]" role="status">{notice}</p>{/if}
+  {#if error}<p class={ui.text} role="alert">{error}</p>{/if}
+  {#if notice}<p class={ui.text} role="status">{notice}</p>{/if}
   <fieldset class="p-0 m-0 min-w-0 border-0" disabled={busy}>
-    <details class={[ui.details, "mt-[1.3rem] border-t border-t-border pt-4"]}>
-      <summary class={[ui.summary, "px-0 py-1"]}>Find advertised directory servers</summary>
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-        >Company DNS domain<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+    <details class={[ui.details, ui.section]}>
+      <summary class={ui.summary}>Find advertised directory servers</summary>
+      <label class={ui.label}
+        >Company DNS domain<input class={ui.field}
           placeholder="example.org"
           bind:value={discoveryDomain}
         /></label
@@ -110,14 +110,14 @@
             result = null;
           }}>{server}</button
         >{/each}
-      <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+      <p class={ui.hint}>
         Uses DNS service records. Selecting a result does not sign in; LDAP
         connections still require verified StartTLS. This does not assume the
         SIP server also hosts your directory.
       </p>
     </details>
     <form
-      class="stack flex flex-col gap-4"
+      class={ui.stack}
       oninput={() => {
         result = null;
       }}
@@ -133,8 +133,8 @@
         });
       }}
     >
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-        >Directory URL<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <label class={ui.label}
+        >Directory URL<input class={ui.field}
           required
           placeholder="ldaps://directory.example.org"
           bind:value={profile.URL}
@@ -152,7 +152,7 @@
                 "The server did not advertise directory bases. Ask your administrator for the base DN.";
           })}>Find directory bases</button
       >
-      {#if bases.length}<label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+      {#if bases.length}<label class={ui.label}
           >Available bases<Dropdown
             label="Available bases"
             value={bases.includes(profile.BaseDN) ? profile.BaseDN : ""}
@@ -167,50 +167,50 @@
             }}
           /></label
         >{/if}
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-        >Base DN<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <label class={ui.label}
+        >Base DN<input class={ui.field}
           required
           placeholder="dc=example,dc=org"
           bind:value={profile.BaseDN}
         /></label
       >
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]">Bind DN (optional)<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]} bind:value={profile.BindDN} /></label>
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-        >Additional CA certificate file (optional)<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <label class={ui.label}>Bind DN (optional)<input class={ui.field} bind:value={profile.BindDN} /></label>
+      <label class={ui.label}
+        >Additional CA certificate file (optional)<input class={ui.field}
           placeholder="System trust by default"
           bind:value={profile.CAFile}
         /></label
       >
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-        >Password<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <label class={ui.label}
+        >Password<input class={ui.field}
           type="password"
           autocomplete="off"
           bind:value={password}
         /></label
       >
-      <label class="flex flex-row gap-[0.65rem] text-[0.9rem] text-[#c8cdd5] items-center min-h-[32px] cursor-pointer"
+      <label class={ui.checkLabel}
         ><input class={ui.checkbox} type="checkbox" bind:checked={profile.UseSecretService} /> Save password
         in the desktop wallet</label
       >
-      <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+      <p class={ui.hint}>
         Leave an existing password empty to keep it. Without the wallet, enter
         the password again after restarting Voiper. LDAP credentials may differ
         from SIP credentials.
       </p>
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-        >Maximum entries<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <label class={ui.label}
+        >Maximum entries<input class={ui.field}
           type="number"
           min="1"
           max="5000"
           bind:value={profile.Limit}
         /></label
       >
-      <label class="flex flex-row gap-[0.65rem] text-[0.9rem] text-[#c8cdd5] items-center min-h-[32px] cursor-pointer"
+      <label class={ui.checkLabel}
         ><input class={ui.checkbox} type="checkbox" bind:checked={profile.Enabled} /> Keep directory contacts
         synchronized</label
       >
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-        >Refresh every (minutes)<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <label class={ui.label}
+        >Refresh every (minutes)<input class={ui.field}
           type="number"
           min="5"
           max="1440"
@@ -218,7 +218,7 @@
         /></label
       >
       <button class={ui.button} disabled={busy}>Save directory</button>
-      <div class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]">
+      <div class={ui.row}>
         <button class={ui.button}
           type="button"
           disabled={busy}
@@ -249,27 +249,27 @@
       </div>
     </form>
   </fieldset>
-  <p class="m-0 leading-[1.6] text-muted text-[0.78rem]" aria-live="polite">
+  <p class={ui.hint} aria-live="polite">
     Last successful refresh: {date(status.LastSuccess)}. {status.Entries || 0} directory
     entries; {status.Preserved || 0} local edits, duplicates or hidden contacts preserved.{status.Partial
       ? " The last scan was partial; missing contacts were kept."
       : ""}
   </p>
-  {#if status.Error}<p class="m-0 leading-[1.6]" role="status">{status.Error}</p>{/if}
-  <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+  {#if status.Error}<p class={ui.text} role="status">{status.Error}</p>{/if}
+  <p class={ui.hint}>
     Editing a synchronized contact keeps a local copy. Deleting it hides it from
     later refreshes. Only a complete scan can remove contacts that disappeared
     from the directory. Changing servers preserves the old phonebook as an
     imported snapshot.
   </p>
   {#if result}
-    <p class="m-0 leading-[1.6]">
+    <p class={ui.text}>
       {result.Contacts.length} entries · {result.Skipped} skipped{result.Truncated
         ? " · limit reached"
         : ""}
     </p>
-    <div class="p-4 whitespace-pre-wrap wrap-anywhere max-h-[180px] overflow-auto text-xs bg-[#1c252e] rounded-[6px]">
-      {#each result.Contacts.slice(0, 20) as entry}<p class="m-0 leading-[1.6]">
+    <div class="p-4 whitespace-pre-wrap wrap-anywhere max-h-[180px] overflow-auto text-xs bg-field rounded-[6px]">
+      {#each result.Contacts.slice(0, 20) as entry}<p class={ui.text}>
           {entry.Name} · {entry.Address}
         </p>{/each}
     </div>

@@ -65,12 +65,12 @@
   allowDeselect={false}
 >
   <Select.Trigger {id} aria-label={label} class={[ui.control, `
-    dropdown-trigger px-[0.8rem] py-[0.65rem] rounded-[6px] bg-[#1c252e] text-[#eef0f3] min-h-[42px]
+    dropdown-trigger px-[0.8rem] py-[0.65rem] rounded-[6px] bg-field text-foreground min-h-[42px]
     shadow-control font-normal flex items-center justify-between gap-3 w-full min-w-0 text-left border
-    border-[#4b5a68] [&_>_svg]:shrink-0 [&_>_svg]:text-[#b8c3d0]
-    [&_>_svg]:[transition:transform_140ms_ease] data-[state=open]:bg-[#303d49]
+    border-field-border [&>svg]:shrink-0 [&>svg]:text-[#b8c3d0]
+    [&>svg]:[transition:transform_140ms_ease] data-[state=open]:bg-[#303d49]
     data-[state=open]:border-[#8b9bad] [&[data-state='open']_>_svg]:[transform:rotate(180deg)]
-    [&:hover:not(:disabled)]:bg-[#303d49] [&:hover:not(:disabled)]:border-[#8b9bad]
+    enabled:hover:bg-[#303d49] enabled:hover:border-[#8b9bad]
   `]}>
     <span class="overflow-hidden whitespace-nowrap text-ellipsis">{selected?.label || "Choose an option"}</span>
     <svg
@@ -89,7 +89,7 @@
     <Select.Content
       class="
         p-[5px] z-[100] w-[var(--bits-select-anchor-width)] max-w-[calc(100vw_-_24px)] rounded-[6px]
-        bg-[#303d49] text-[#eef0f3] [box-shadow:0_10px_32px_#0009] outline-none
+        bg-[#303d49] text-foreground [box-shadow:0_10px_32px_#0009] outline-none
         border border-[#505b69]
       "
       sideOffset={6}

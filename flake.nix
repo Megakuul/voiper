@@ -27,7 +27,7 @@
         old.postFixup;
     });
     voiper = pkgs.callPackage ./nix/package.nix {
-      inherit nodejs pnpm;
+      inherit go nodejs pnpm;
       buildGoModule = pkgs.buildGoModule.override {inherit go;};
     };
   in {

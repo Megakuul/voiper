@@ -29,7 +29,7 @@
           `relative flex items-center gap-[0.85rem] w-full min-h-[44px] px-[0.8rem] py-[0.7rem]
           rounded-[6px] text-left font-medium outline-offset-3 cursor-pointer transition-colors
           duration-100 max-[1100px]:p-[0.65rem] max-[1100px]:justify-center
-          max-[700px]:text-[0.85rem] hover:bg-[#36424e]/60 hover:text-[#eef0f3] focus-visible:bg-[#36424e]/60 focus-visible:text-[#eef0f3]
+          max-[700px]:text-[0.85rem] hover:bg-[#36424e]/60 hover:text-foreground focus-visible:bg-[#36424e]/60 focus-visible:text-foreground
           after:absolute after:left-0 after:top-3 after:bottom-3 after:w-[2px] after:rounded-full
           after:transition-colors after:duration-100`,
           page === key ? "text-accent-text after:bg-brand-border" : "text-muted after:bg-transparent",

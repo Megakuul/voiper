@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 func migrate(db *sql.DB) error {
@@ -50,4 +51,48 @@ PRAGMA user_version=3;`)
 		}
 	}
 	return tx.Commit()
+}
+
+// legacyContacts reads contacts stored in SQLite before contacts.toml existed.
+func legacyContacts(db *sql.DB) ([]Contact, error) {
+	rows, err := db.Query(`SELECT id,name,address,notes,source,favorite,account,updated,
+COALESCE((SELECT remote_id FROM directory_entries WHERE contact_id=contacts.id LIMIT 1),'') FROM contacts ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	contacts := []Contact{}
+	positions := map[int64]int{}
+	for rows.Next() {
+		var c Contact
+		var updated string
+		if err = rows.Scan(&c.ID, &c.Name, &c.Address, &c.Notes, &c.Source, &c.Favorite, &c.Account, &updated, &c.DirectoryID); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		c.Updated, _ = time.Parse(time.RFC3339Nano, updated)
+		c.Numbers = []ContactNumber{}
+		positions[c.ID] = len(contacts)
+		contacts = append(contacts, c)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	rows, err = db.Query(`SELECT contact_id,label,address FROM contact_numbers ORDER BY contact_id,position`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var n ContactNumber
+		if err = rows.Scan(&id, &n.Label, &n.Address); err != nil {
+			return nil, err
+		}
+		if i, ok := positions[id]; ok {
+			contacts[i].Numbers = append(contacts[i].Numbers, n)
+		}
+	}
+	return contacts, rows.Err()
 }

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/emersion/go-vcard"
+	"github.com/megakuul/voiper/internal/compat/swyx"
 )
 
 type ContactImportEntry struct {
@@ -46,8 +48,10 @@ func parseContactFile(format, text string) ([]ContactImportEntry, error) {
 		entries, err = parseCSVEntries(text)
 	case "vcard":
 		entries, err = parseVCardEntries(text)
+	case "xml":
+		entries, err = parsePhonebookEntries(text)
 	default:
-		return nil, errors.New("choose CSV or vCard import")
+		return nil, errors.New("choose CSV, vCard or Swyx XML import")
 	}
 	if err != nil {
 		return nil, err
@@ -183,6 +187,42 @@ func parseVCardEntries(text string) ([]ContactImportEntry, error) {
 		}
 		if len(addresses) == 0 {
 			entry.Action, entry.Detail = "invalid", "no phone number or SIP address"
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
+}
+
+// parsePhonebookEntries converts a Swyx phonebook export. The number with
+// published presence becomes the primary address, so status and dialing use
+// the extension; the remaining numbers keep readable labels.
+func parsePhonebookEntries(text string) ([]ContactImportEntry, error) {
+	phonebook, err := swyx.ParsePhonebook([]byte(text))
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]ContactImportEntry, 0, len(phonebook))
+	for i, item := range phonebook {
+		entry := ContactImportEntry{Record: i + 1, Contact: Contact{Name: item.Name, Company: item.Company, Numbers: []ContactNumber{}}}
+		primary := slices.IndexFunc(item.Numbers, func(n swyx.PhonebookNumber) bool { return n.Presence })
+		if primary < 0 {
+			primary = 0
+		}
+		for j, number := range item.Numbers {
+			if j == primary {
+				entry.Contact.Address = number.Number
+				continue
+			}
+			label := strings.Join(number.Types, "/")
+			if slices.Contains(number.Types, "Cell") {
+				label = "Mobile"
+			} else if slices.Contains(number.Types, "IPPhone") {
+				label = "Extension"
+			}
+			entry.Contact.Numbers = append(entry.Contact.Numbers, ContactNumber{Label: label, Address: number.Number})
+		}
+		if len(item.Numbers) == 0 {
+			entry.Action, entry.Detail = "invalid", "no phone number"
 		}
 		entries = append(entries, entry)
 	}

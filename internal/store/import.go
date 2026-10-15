@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -26,34 +27,21 @@ func (s *Store) ImportContacts(contacts []Contact) (int, error) {
 			return 0, fmt.Errorf("contact %d: %w", i+1, err)
 		}
 	}
-	tx, err := s.db.Begin()
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
 	count := 0
-	for _, c := range contacts {
-		result, err := tx.Exec(`INSERT INTO contacts(name,address,notes,source,favorite,account,updated) VALUES(?,?,?,?,?,?,?) ON CONFLICT(address) DO NOTHING`, c.Name, c.Address, c.Notes, c.Source, c.Favorite, c.Account, time.Now().Format(time.RFC3339Nano))
-		if err != nil {
-			return 0, err
-		}
-		n, err := result.RowsAffected()
-		if err != nil {
-			return 0, err
-		}
-		if n == 0 {
-			continue
-		}
-		id, err := result.LastInsertId()
-		if err != nil {
-			return 0, err
-		}
-		for i, number := range c.Numbers {
-			if _, err = tx.Exec(`INSERT INTO contact_numbers(contact_id,label,address,position) VALUES(?,?,?,?)`, id, number.Label, strings.TrimSpace(number.Address), i); err != nil {
-				return 0, err
+	err := s.updateContacts(func(existing []Contact) ([]Contact, error) {
+		now := time.Now()
+		for _, c := range contacts {
+			if slices.ContainsFunc(existing, func(other Contact) bool { return other.Address == c.Address }) {
+				continue
 			}
+			c.ID = nextContactID(existing)
+			c.DirectoryID = ""
+			c.Numbers = trimNumbers(c.Numbers)
+			c.Updated = now
+			existing = append(existing, c)
+			count++
 		}
-		count++
-	}
-	return count, tx.Commit()
+		return existing, nil
+	})
+	return count, err
 }

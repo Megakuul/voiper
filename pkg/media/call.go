@@ -374,7 +374,7 @@ func (c *Call) connect(remoteSDP []byte, early, remoteOffer bool, explicitOffer 
 	if !c.selected {
 		offered := false
 		for _, format := range c.formats {
-			if strings.EqualFold(format.Name, remote.format.Name) && format.PayloadType == remote.format.PayloadType {
+			if strings.EqualFold(format.Name, remote.format.Name) && format.ClockRate == remote.format.ClockRate {
 				offered = true
 			}
 		}
@@ -410,7 +410,13 @@ func (c *Call) connect(remoteSDP []byte, early, remoteOffer bool, explicitOffer 
 	}
 	next := c.pipeline
 	if next == nil || changed {
-		next, err = newPipeline(c.ctx, remote.format, c.deviceRate)
+		receivePayloadType := remote.format.PayloadType
+		if !remoteOffer && len(localOffer) > 0 {
+			if offered, err := negotiate(localOffer, []codec.Format{remote.format}); err == nil {
+				receivePayloadType = offered.format.PayloadType
+			}
+		}
+		next, err = newPipeline(c.ctx, remote.format, receivePayloadType, c.deviceRate)
 		if err != nil {
 			return err
 		}
@@ -738,6 +744,9 @@ func (c *Call) playback(p *mediaPipeline) {
 	defer p.workers.Done()
 	defer c.workers.Done()
 	coder, format := p.coder, p.format
+	isAudio := func(payloadType uint8) bool {
+		return payloadType == format.PayloadType || payloadType == p.receivePayloadType
+	}
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 	buffer := rtp.NewJitterBuffer(3)
@@ -763,7 +772,7 @@ func (c *Call) playback(p *mediaPipeline) {
 			telephone := c.remote.telephone
 			hasTelephone := c.remote.hasTelephone
 			c.mu.Unlock()
-			if packet.PayloadType == format.PayloadType || (hasTelephone && packet.PayloadType == telephone) {
+			if isAudio(packet.PayloadType) || (hasTelephone && packet.PayloadType == telephone) {
 				buffer.Push(packet)
 			}
 		case <-ticker.C:
@@ -779,12 +788,12 @@ func (c *Call) playback(p *mediaPipeline) {
 					continue
 				}
 				var nextPayload []byte
-				if next := buffer.Peek(); next != nil && next.PayloadType == format.PayloadType {
+				if next := buffer.Peek(); next != nil && isAudio(next.PayloadType) {
 					nextPayload = next.Payload
 				}
 				pcm, err = coder.Conceal(lastSamples, nextPayload)
 			} else {
-				if packet.PayloadType != format.PayloadType {
+				if !isAudio(packet.PayloadType) {
 					continue
 				}
 				pcm, err = coder.Decode(packet.Payload)

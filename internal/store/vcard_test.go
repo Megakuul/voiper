@@ -6,7 +6,7 @@ import (
 )
 
 func TestVCardImportIsAtomicAndPreservesNumbers(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}

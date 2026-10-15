@@ -3,7 +3,6 @@ package media
 import (
 	"bytes"
 	"errors"
-	"strings"
 
 	"github.com/megakuul/voiper/pkg/audio"
 
@@ -44,15 +43,14 @@ func (c *Call) validateAnswer(localOffer, answer []byte) error {
 	if err != nil {
 		return err
 	}
+	// The answer may give the selected codec its own payload number; the pipeline
+	// sends with that number and still accepts the one from our offer.
 	offered, err := negotiate(localOffer, []codec.Format{remote.format})
-	if err != nil || offered.format.PayloadType != remote.format.PayloadType {
-		return errors.New("answer selected a codec or payload mapping that was not offered")
+	if err != nil {
+		return errors.New("answer selected a codec that was not offered")
 	}
-	for payload := range remote.payloads {
-		if !offered.payloads[payload] || !strings.EqualFold(strings.TrimSuffix(remote.mappings[payload], "/1"), strings.TrimSuffix(offered.mappings[payload], "/1")) {
-			return errors.New("answer includes a payload mapping that was not offered")
-		}
-	}
+	// RFC 3264 section 6.1 lets an answer list further codecs, as SwyxIt! clients
+	// do. Only the selected codec and telephone events are sent, so others are ignored.
 	if c.deviceRate != 0 && remote.format.SampleRate != c.deviceRate && !audio.DSPAvailable() {
 		return errors.New("codec rate conversion requires SpeexDSP")
 	}
@@ -93,8 +91,10 @@ func (c *Call) validateAnswer(localOffer, answer []byte) error {
 	if (remote.send && !offered.receive) || (remote.receive && !offered.send) {
 		return errors.New("answer direction is incompatible with the local offer")
 	}
-	if remote.hasTelephone && (!offered.hasTelephone || remote.telephone != offered.telephone) {
-		return errors.New("answer selected a telephone-event mapping that was not offered")
+	// The answer may number telephone events differently; DTMF is sent with its
+	// payload type, and later offers reuse it.
+	if remote.hasTelephone && !offered.hasTelephone {
+		return errors.New("answer selected telephone events that were not offered")
 	}
 	return nil
 }

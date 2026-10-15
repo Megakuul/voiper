@@ -1,4 +1,7 @@
 <script>
+  // Optional settings are grouped in bordered disclosures.
+  const optionSummary = "list-none mb-[0.8rem] px-[18px] py-[16px] max-[600px]:p-[14px] font-medium text-[#d1dce5] cursor-pointer outline-offset-3";
+  const optionBody = "stack flex flex-col gap-[18px] px-[18px] pt-[4px] pb-[20px] max-[600px]:px-[14px] max-[600px]:pt-0 max-[600px]:pb-[16px]";
   import { ui } from "../ui.js";
   import { onMount } from "svelte";
   import Dropdown from "../components/Dropdown.svelte";
@@ -60,13 +63,7 @@
   accounts-layout grid grid-cols-[minmax(230px,0.75fr)_minmax(0,1.5fr)] items-start gap-[24px]
   max-[850px]:grid-cols-[minmax(0,1fr)]
 ">
-  <section class="
-    panel account-list p-6 bg-surface shadow-panel border-t-[#526271] border-r-border border-b-border
-    border-l-border rounded-[6px] min-w-0 border max-[700px]:p-[1.15rem]
-    [&_>_button_+_button]:mt-4 [&_form_+_details_button]:mt-2 [&_form_+_details_button]:mr-2
-    [&_form_+_details_button]:mb-0 [&_form_+_details_button]:ml-0 [&_>_h2:first-child]:pb-4
-    [&_>_h2:first-child]:border-b [&_>_h2:first-child]:border-b-border [&_>_.row_+_.row]:mt-4
-  ">
+  <section class={ui.card}>
     <h2 class={ui.h2}>Your accounts</h2>
     <p class="mt-[8px] mb-[24px] mx-0 leading-[1.6] text-muted text-[0.78rem]">
       Enable an account to make and receive calls. You can use more than one at
@@ -74,37 +71,21 @@
     </p>
     {#each Object.entries(configs) as [n, encrypted]}
       {@const active = snapshot.Accounts.find((a) => a.Name === n)}
-      <div class="
-        account-item grid gap-[16px] py-[20px] border-b-0 [&+.account-item]:border-t
-        [&+.account-item]:border-[var(--border)] [&>p]:m-0 [&>p]:[overflow-wrap:anywhere] px-0
-        [&_>_label]:mb-[0.9rem] [&_details]:p-0 [&_details]:m-0 [&_details]:border-0 [&_>_.row]:mb-[0.9rem]
-      ">
-        <div class="
-          row flex items-center gap-[0.7rem] justify-between max-[700px]:flex-wrap [&_>_button]:shrink-0
-          max-[700px]:[&_>_.grow]:basis-[180px]
-        ">
-          <strong class="[overflow-wrap:anywhere]">{n}</strong><span class="px-[0.7rem] py-[0.3rem] rounded-[4px] bg-[#435362] text-xs"
+      <div class="account-item grid gap-[16px] py-[20px] [&+.account-item]:border-t [&+.account-item]:border-border">
+        <div class={[ui.row, "justify-between mb-[0.9rem]"]}>
+          <strong class="[overflow-wrap:anywhere]">{n}</strong><span class={ui.badge}
             >{active?.State || "disabled"}</span
           >
         </div>
-        {#if encrypted}<label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Unlock key<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+        {#if encrypted}<label class={[ui.label, "mb-[0.9rem]"]}
+            >Unlock key<input class={ui.field}
               type="password"
               autocomplete="off"
               bind:value={keys[n]}
             /></label
           >{/if}
-        <div class="
-          row flex items-center gap-[0.7rem] flex-wrap max-[700px]:flex-wrap [&_>_button]:shrink-0
-          max-[700px]:[&_>_.grow]:basis-[180px]
-        ">
-          <button class={[ui.control, `
-            px-4 py-[0.65rem] rounded-[6px] bg-[#35424e] text-inherit min-h-[38px] shadow-control font-medium border
-            border-[#536271] [&.primary]:bg-brand [&.primary]:text-white [&.primary]:font-semibold
-            [&.primary]:border-brand-border [&.primary:hover:enabled]:bg-brand-hover
-            [&:hover:not(:disabled)]:bg-[#435362] [&:hover:not(:disabled)]:border-[#727e8d]
-          `]}
-            class:primary={!active}
+        <div class={[ui.row, "flex-wrap"]}>
+          <button class={!active ? ui.primaryButton : ui.button}
             onclick={() =>
               run(async () => {
                 if (active) await api.DisableConfig(n);
@@ -116,13 +97,13 @@
               onclick={() => run(() => api.RetryRegistration(n))}
               >Retry registration</button
             >{/if}
-          <details class={[ui.details, "account-removal w-full [&_button]:w-full mt-[1.3rem] border-t border-t-border pt-4"]}>
-            <summary class={[ui.summary, "px-0 py-1"]}>Remove account…</summary>
+          <details class={[ui.details, "w-full"]}>
+            <summary class={ui.summary}>Remove account…</summary>
             <div class="stack pt-[12px] flex flex-col gap-4">
-              <button class={ui.button} onclick={() => run(() => api.DeleteSavedPassword(n))}
+              <button class={[ui.button, "w-full"]} onclick={() => run(() => api.DeleteSavedPassword(n))}
                 >Delete saved wallet password</button
               ><button
-                class={[ui.dangerButton, "danger"]}
+                class={[ui.dangerButton, "w-full"]}
                 onclick={() =>
                   run(async () => {
                     await api.RemoveConfig(n, encrypted);
@@ -132,24 +113,15 @@
             </div>
           </details>
         </div>
-        {#if active?.Error}<p class="m-0 leading-[1.6] text-[#f9a8b9]">{active.Error}</p>{/if}
-        {#if active?.Capabilities}<p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+        {#if active?.Error}<p class={[ui.error, "wrap-anywhere"]}>{active.Error}</p>{/if}
+        {#if active?.Capabilities}<p class={[ui.hint, "wrap-anywhere"]}>
             {active.Capabilities.Detail}
           </p>{/if}
       </div>
-    {:else}<p class="px-0 py-8 m-0 leading-[1.6] text-muted text-center">Add your SIP account to get started.</p>{/each}
+    {:else}<p class={ui.empty}>Add your SIP account to get started.</p>{/each}
   </section>
-  <section class="
-    panel account-editor p-6 bg-surface shadow-panel border-t-[#526271] border-r-border border-b-border
-    border-l-border rounded-[6px] min-w-0 border max-[700px]:p-[1.15rem]
-    [&_>_button_+_button]:mt-4 [&_form_+_details_button]:mt-2 [&_form_+_details_button]:mr-2
-    [&_form_+_details_button]:mb-0 [&_form_+_details_button]:ml-0 [&_>_h2:first-child]:pb-4
-    [&_>_h2:first-child]:border-b [&_>_h2:first-child]:border-b-border [&_>_.row_+_.row]:mt-4
-  ">
-    <div class="
-      row flex items-center gap-[0.7rem] justify-between flex-wrap max-[700px]:flex-wrap
-      [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]
-    ">
+  <section class={ui.card}>
+    <div class={[ui.row, "justify-between flex-wrap"]}>
       <h2 class={ui.h2}>{editing ? "Edit account" : "Add an account"}</h2>
       {#if editing}
         <button class={ui.button}
@@ -177,22 +149,22 @@
       }}
     >
       <div class="form-section grid gap-[20px]">
-        <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-          >Account name<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+        <label class={ui.label}
+          >Account name<input class={ui.field}
             required
             bind:value={name}
             readonly={editing}
           /></label
         >
-        <div class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]">
-          <label class="grow flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5] flex-1 min-w-0"
-            >SIP server<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+        <div class={ui.row}>
+          <label class="grow flex flex-col gap-2 text-[0.9rem] text-label flex-1 min-w-0"
+            >SIP server<input class={ui.field}
               required
               placeholder="pbx.example.com"
               bind:value={cfg.Server}
             /></label
-          ><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5] max-w-[100px]"
-            >Port<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+          ><label class="flex flex-col gap-2 text-[0.9rem] text-label max-w-[100px]"
+            >Port<input class={ui.field}
               type="number"
               min="0"
               max="65535"
@@ -200,39 +172,39 @@
             /></label
           >
         </div>
-        <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-          >Username / extension<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+        <label class={ui.label}
+          >Username / extension<input class={ui.field}
             required
             bind:value={cfg.Username}
           /></label
-        ><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-          >SIP password<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+        ><label class={ui.label}
+          >SIP password<input class={ui.field}
             type="password"
             autocomplete="new-password"
             bind:value={cfg.Password}
           /></label
-        ><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]">Display name<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]} bind:value={cfg.DisplayName} /></label>
+        ><label class={ui.label}>Display name<input class={ui.field} bind:value={cfg.DisplayName} /></label>
       </div>
-      <div class="form-section account-preferences grid gap-[12px] py-[20px] border-y border-[var(--border)] [&_p]:m-0 [&_p]:pl-[28px]">
-        <label class="flex flex-row gap-[0.65rem] text-[0.9rem] text-[#c8cdd5] items-center min-h-[32px] cursor-pointer"
+      <div class="form-section account-preferences grid gap-[12px] py-[20px] border-y border-border">
+        <label class={ui.checkLabel}
           ><input class={ui.checkbox} type="checkbox" bind:checked={cfg.AutoEnable} /> Register automatically
           on startup</label
         >
-        <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+        <p class={[ui.hint, "pl-[28px]"]}>
           Encrypted account files still require manual unlocking. Desktop wallet
           accounts may ask to unlock the wallet.
         </p>
-        <label class="flex flex-row gap-[0.65rem] text-[0.9rem] text-[#c8cdd5] items-center min-h-[32px] cursor-pointer"
+        <label class={ui.checkLabel}
           ><input class={ui.checkbox} type="checkbox" bind:checked={cfg.UseSecretService} /> Store SIP
           password in the desktop wallet</label
         >
-        {#if cfg.UseSecretService}<p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+        {#if cfg.UseSecretService}<p class={[ui.hint, "pl-[28px]"]}>
             The account file contains no SIP password. Leave the password blank
             to keep the saved wallet entry; enabling the account may ask to
             unlock your wallet.
           </p>{/if}
       </div>
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+      <label class={ui.label}
         >Transport<Dropdown
           label="Transport"
           bind:value={cfg.Transport}
@@ -243,53 +215,53 @@
           ]}
         /></label
       >
-      <div class="form-actions grid justify-items-start gap-[12px] [&_p]:m-0">
-        <button class={[ui.primaryButton, "primary"]} type="submit">Save account</button>
-        <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+      <div class="form-actions grid justify-items-start gap-[12px]">
+        <button class={ui.primaryButton} type="submit">Save account</button>
+        <p class={ui.hint}>
           Re-enable this account after saving to apply changes.
         </p>
       </div>
       <h3 class="advanced-heading mt-[12px] mb-0 text-base mx-0 font-semibold">Optional settings</h3>
-      <details class={[ui.details, "m-0 border border-[var(--border)] rounded-[6px] p-0 [&_p]:m-0"]}>
-        <summary class={[ui.summary, "py-[16px] px-[18px] font-medium max-[600px]:p-[14px]"]}>SIP connection</summary>
-        <div class="stack pt-[4px] px-[18px] pb-[20px] gap-[18px] max-[600px]:pt-0 max-[600px]:px-[14px] max-[600px]:pb-[16px] flex flex-col">
-          <label class="flex flex-row gap-[0.65rem] text-[0.9rem] text-[#c8cdd5] items-center min-h-[32px] cursor-pointer"
+      <details class={[ui.details, "m-0 p-0 border border-border rounded-[6px]"]}>
+        <summary class={optionSummary}>SIP connection</summary>
+        <div class={optionBody}>
+          <label class={ui.checkLabel}
             ><input class={ui.checkbox} type="checkbox" bind:checked={cfg.DelayedOffer} /> Let the server
             offer audio (delayed offer)</label
           >
-          <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+          <p class={ui.hint}>
             Enable if your provider supplies the audio offer. Reliable
             provisional offers are answered separately for each endpoint;
             microphone capture starts after the final answer.
           </p>
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >SIP domain<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+          <label class={ui.label}
+            >SIP domain<input class={ui.field}
               placeholder="Defaults to server"
               bind:value={cfg.Domain}
             /></label
-          ><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Authentication username<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+          ><label class={ui.label}
+            >Authentication username<input class={ui.field}
               placeholder="Defaults to username"
               bind:value={cfg.AuthUsername}
             /></label
-          ><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]">Outbound proxy<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]} bind:value={cfg.OutboundProxy} /></label
-          ><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Local signaling address<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+          ><label class={ui.label}>Outbound proxy<input class={ui.field} bind:value={cfg.OutboundProxy} /></label
+          ><label class={ui.label}
+            >Local signaling address<input class={ui.field}
               placeholder="Automatic"
               bind:value={cfg.LocalAddress}
             /></label
-          ><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Advertised media IP<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+          ><label class={ui.label}
+            >Advertised media IP<input class={ui.field}
               placeholder="Determined from route to server"
               bind:value={cfg.MediaAddress}
             /></label
           >
         </div>
       </details>
-      <details class={[ui.details, "m-0 border border-[var(--border)] rounded-[6px] p-0 [&_p]:m-0"]}>
-        <summary class={[ui.summary, "py-[16px] px-[18px] font-medium max-[600px]:p-[14px]"]}>Call encryption</summary>
-        <div class="stack pt-[4px] px-[18px] pb-[20px] gap-[18px] max-[600px]:pt-0 max-[600px]:px-[14px] max-[600px]:pb-[16px] flex flex-col">
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+      <details class={[ui.details, "m-0 p-0 border border-border rounded-[6px]"]}>
+        <summary class={optionSummary}>Call encryption</summary>
+        <div class={optionBody}>
+          <label class={ui.label}
             >Media encryption<Dropdown
               label="Media encryption"
               bind:value={cfg.MediaSecurity}
@@ -310,7 +282,7 @@
               }}
             /></label
           >
-          <label class="flex flex-row gap-[0.65rem] text-[0.9rem] text-[#c8cdd5] items-center min-h-[32px] cursor-pointer">
+          <label class={ui.checkLabel}>
             <input class={ui.checkbox}
               type="checkbox"
               bind:checked={cfg.SymmetricRTP}
@@ -318,17 +290,17 @@
             />
             Allow authenticated SRTP port changes
           </label>
-          <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+          <p class={ui.hint}>
             Requires SDES-SRTP over TLS. Accepts a new port only after packet
             authentication from the same IP address. ICE takes precedence; plain
             RTP and DTLS paths remain fixed.
           </p>
         </div>
       </details>
-      <details class={[ui.details, "m-0 border border-[var(--border)] rounded-[6px] p-0 [&_p]:m-0"]}>
-        <summary class={[ui.summary, "py-[16px] px-[18px] font-medium max-[600px]:p-[14px]"]}>Provider compatibility and voicemail</summary>
-        <div class="stack pt-[4px] px-[18px] pb-[20px] gap-[18px] max-[600px]:pt-0 max-[600px]:px-[14px] max-[600px]:pb-[16px] flex flex-col">
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+      <details class={[ui.details, "m-0 p-0 border border-border rounded-[6px]"]}>
+        <summary class={optionSummary}>Provider compatibility and voicemail</summary>
+        <div class={optionBody}>
+          <label class={ui.label}
             >DTMF<Dropdown
               label="DTMF"
               bind:value={cfg.DTMFMode}
@@ -339,7 +311,7 @@
               ]}
             /></label
           >
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+          <label class={ui.label}
             >Presence<Dropdown
               label="Presence"
               bind:value={cfg.PresenceMode}
@@ -352,7 +324,7 @@
               ]}
             /></label
           >
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+          <label class={ui.label}
             >Messaging<Dropdown
               label="Messaging"
               bind:value={cfg.MessagingMode}
@@ -364,41 +336,41 @@
               ]}
             /></label
           >
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]">Voicemail number<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]} bind:value={cfg.Voicemail} /></label>
+          <label class={ui.label}>Voicemail number<input class={ui.field} bind:value={cfg.Voicemail} /></label>
         </div>
       </details>
-      <details class={[ui.details, "m-0 border border-[var(--border)] rounded-[6px] p-0 [&_p]:m-0"]}>
-        <summary class={[ui.summary, "py-[16px] px-[18px] font-medium max-[600px]:p-[14px]"]}>Call forwarding</summary>
-        <div class="stack pt-[4px] px-[18px] pb-[20px] gap-[18px] max-[600px]:pt-0 max-[600px]:px-[14px] max-[600px]:pb-[16px] flex flex-col">
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Always forward to<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <details class={[ui.details, "m-0 p-0 border border-border rounded-[6px]"]}>
+        <summary class={optionSummary}>Call forwarding</summary>
+        <div class={optionBody}>
+          <label class={ui.label}
+            >Always forward to<input class={ui.field}
               bind:value={cfg.ForwardAlways}
               placeholder="Disabled when empty"
             /></label
           >
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Forward when busy or DND<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+          <label class={ui.label}
+            >Forward when busy or DND<input class={ui.field}
               bind:value={cfg.ForwardBusy}
             /></label
           >
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Forward when unanswered<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+          <label class={ui.label}
+            >Forward when unanswered<input class={ui.field}
               bind:value={cfg.ForwardNoAnswer}
             /></label
           >
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Ring for seconds<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+          <label class={ui.label}
+            >Ring for seconds<input class={ui.field}
               type="number"
               min="5"
               max="300"
               bind:value={cfg.NoAnswerSeconds}
             /></label
           >
-          <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+          <p class={ui.hint}>
             Forwarding sends a SIP redirect; your PBX must support it. Settings
             apply after re-enabling this account.
           </p>
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+          <label class={ui.label}
             >Follow remote redirects<Dropdown
               label="Follow remote redirects"
               bind:value={cfg.MaxRedirects}
@@ -411,11 +383,11 @@
           >
         </div>
       </details>
-      <details class={[ui.details, "m-0 border border-[var(--border)] rounded-[6px] p-0 [&_p]:m-0"]}>
-        <summary class={[ui.summary, "py-[16px] px-[18px] font-medium max-[600px]:p-[14px]"]}>Audio codec preference</summary>
-        <div class="stack pt-[4px] px-[18px] pb-[20px] gap-[18px] max-[600px]:pt-0 max-[600px]:px-[14px] max-[600px]:pb-[16px] flex flex-col">
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Codec preference<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <details class={[ui.details, "m-0 p-0 border border-border rounded-[6px]"]}>
+        <summary class={optionSummary}>Audio codec preference</summary>
+        <div class={optionBody}>
+          <label class={ui.label}
+            >Codec preference<input class={ui.field}
               value={(cfg.Codecs || []).join(", ")}
               onchange={(e) =>
                 (cfg.Codecs = e.target.value
@@ -425,22 +397,22 @@
               placeholder="OPUS, G722, PCMA, PCMU"
             /></label
           >
-          <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+          <p class={ui.hint}>
             Leave empty for the default quality preference. Both peers negotiate
             a common codec.
           </p>
         </div>
       </details>
-      <details class={[ui.details, "m-0 border border-[var(--border)] rounded-[6px] p-0 [&_p]:m-0"]}>
-        <summary class={[ui.summary, "py-[16px] px-[18px] font-medium max-[600px]:p-[14px]"]}>Network traversal and certificates</summary>
-        <div class="stack pt-[4px] px-[18px] pb-[20px] gap-[18px] max-[600px]:pt-0 max-[600px]:px-[14px] max-[600px]:pb-[16px] flex flex-col">
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Additional TLS CA file<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <details class={[ui.details, "m-0 p-0 border border-border rounded-[6px]"]}>
+        <summary class={optionSummary}>Network traversal and certificates</summary>
+        <div class={optionBody}>
+          <label class={ui.label}
+            >Additional TLS CA file<input class={ui.field}
               bind:value={cfg.TLSCAFile}
               placeholder="System trust by default"
             /></label
           >
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+          <label class={ui.label}
             >ICE traversal<Dropdown
               label="ICE traversal"
               bind:value={cfg.ICEPolicy}
@@ -458,9 +430,9 @@
             /></label
           >
           {#each cfg.ICEServers || [] as server, i}
-            <div class="stack repeated-fields p-[18px] border border-[var(--border)] rounded-[6px] [&_button]:self-start flex flex-col gap-4">
-              <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-                >STUN / TURN URLs<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+            <div class="stack repeated-fields p-[18px] border border-border rounded-[6px] flex flex-col gap-4">
+              <label class={ui.label}
+                >STUN / TURN URLs<input class={ui.field}
                   value={(server.URLs || []).join(", ")}
                   onchange={(e) =>
                     (server.URLs = e.target.value
@@ -470,15 +442,15 @@
                   placeholder="stun:host:3478, turn:host:3478"
                 /></label
               >
-              <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]">TURN username<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]} bind:value={server.Username} /></label>
-              <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-                >TURN credential<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+              <label class={ui.label}>TURN username<input class={ui.field} bind:value={server.Username} /></label>
+              <label class={ui.label}
+                >TURN credential<input class={ui.field}
                   type="password"
                   autocomplete="new-password"
                   bind:value={server.Credential}
                 /></label
               >
-              <button class={ui.button}
+              <button class={[ui.button, "self-start"]}
                 type="button"
                 onclick={() =>
                   (cfg.ICEServers = cfg.ICEServers.filter((_, n) => n !== i))}
@@ -495,34 +467,34 @@
                 { URLs: [], Username: "", Credential: "" },
               ])}>Add STUN / TURN server</button
           >
-          <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+          <p class={ui.hint}>
             TURN credentials are saved in the account file; use an encryption
             key to encrypt the whole profile.
           </p>
         </div>
       </details>
-      <details class={[ui.details, "m-0 border border-[var(--border)] rounded-[6px] p-0 [&_p]:m-0"]}>
-        <summary class={[ui.summary, "py-[16px] px-[18px] font-medium max-[600px]:p-[14px]"]}>PBX feature codes</summary>
-        <div class="stack pt-[4px] px-[18px] pb-[20px] gap-[18px] max-[600px]:pt-0 max-[600px]:px-[14px] max-[600px]:pb-[16px] flex flex-col">
-          <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+      <details class={[ui.details, "m-0 p-0 border border-border rounded-[6px]"]}>
+        <summary class={optionSummary}>PBX feature codes</summary>
+        <div class={optionBody}>
+          <p class={ui.hint}>
             Configure your PBX's pickup, parking, unpark or conference codes.
             Use {"{number}"} in a target to insert the dial field.
           </p>
           {#each cfg.Features || [] as feature, i}
-            <div class="stack repeated-fields p-[18px] border border-[var(--border)] rounded-[6px] [&_button]:self-start flex flex-col gap-4">
-              <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-                >Feature name<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+            <div class="stack repeated-fields p-[18px] border border-border rounded-[6px] flex flex-col gap-4">
+              <label class={ui.label}
+                >Feature name<input class={ui.field}
                   bind:value={feature.Name}
                   placeholder="Call pickup"
                 /></label
               >
-              <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-                >Target<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+              <label class={ui.label}
+                >Target<input class={ui.field}
                   bind:value={feature.Target}
                   placeholder="*8"
                 /></label
               >
-              <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+              <label class={ui.label}
                 >Action<Dropdown
                   label="Feature action"
                   bind:value={feature.Action}
@@ -532,7 +504,7 @@
                   ]}
                 /></label
               >
-              <button class={ui.button}
+              <button class={[ui.button, "self-start"]}
                 type="button"
                 onclick={() =>
                   (cfg.Features = cfg.Features.filter((_, n) => n !== i))}
@@ -551,24 +523,24 @@
           >
         </div>
       </details>
-      <details class={[ui.details, "m-0 border border-[var(--border)] rounded-[6px] p-0 [&_p]:m-0"]}>
-        <summary class={[ui.summary, "py-[16px] px-[18px] font-medium max-[600px]:p-[14px]"]}>Account file encryption</summary>
-        <div class="stack pt-[4px] px-[18px] pb-[20px] gap-[18px] max-[600px]:pt-0 max-[600px]:px-[14px] max-[600px]:pb-[16px] flex flex-col">
-          <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-            >Configuration encryption key<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <details class={[ui.details, "m-0 p-0 border border-border rounded-[6px]"]}>
+        <summary class={optionSummary}>Account file encryption</summary>
+        <div class={optionBody}>
+          <label class={ui.label}
+            >Configuration encryption key<input class={ui.field}
               type="password"
               autocomplete="new-password"
               placeholder="Empty stores the account without encryption"
               bind:value={key}
             /></label
           >
-          <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+          <p class={ui.hint}>
             Keep the same encryption mode when editing an existing account.
           </p>
         </div>
       </details>
-      <div class="form-actions grid justify-items-start gap-[12px] [&_p]:m-0">
-        <button class={[ui.primaryButton, "primary"]} type="submit">Save account</button>
+      <div class="form-actions grid justify-items-start gap-[12px]">
+        <button class={ui.primaryButton} type="submit">Save account</button>
       </div>
     </form>
   </section>

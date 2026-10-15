@@ -853,15 +853,16 @@ export namespace store {
 	export class Contact {
 	    ID: number;
 	    Name: string;
+	    Company: string;
 	    Address: string;
+	    Numbers: ContactNumber[];
 	    Notes: string;
-	    Source: string;
 	    Favorite: boolean;
 	    Account: string;
+	    Source: string;
+	    DirectoryID: string;
 	    // Go type: time
 	    Updated: any;
-	    Numbers: ContactNumber[];
-	    DirectoryID: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Contact(source);
@@ -871,14 +872,15 @@ export namespace store {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ID = source["ID"];
 	        this.Name = source["Name"];
+	        this.Company = source["Company"];
 	        this.Address = source["Address"];
+	        this.Numbers = this.convertValues(source["Numbers"], ContactNumber);
 	        this.Notes = source["Notes"];
-	        this.Source = source["Source"];
 	        this.Favorite = source["Favorite"];
 	        this.Account = source["Account"];
-	        this.Updated = this.convertValues(source["Updated"], null);
-	        this.Numbers = this.convertValues(source["Numbers"], ContactNumber);
+	        this.Source = source["Source"];
 	        this.DirectoryID = source["DirectoryID"];
+	        this.Updated = this.convertValues(source["Updated"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

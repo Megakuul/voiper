@@ -180,9 +180,12 @@ ordinary SIP presence subscriptions and maps available, offline, in-call, away
 and DND. Auto mode understands these payloads without adding vendor code to
 `pkg/sip`. Server banners are capability hints, not proof of interoperability.
 
-To see contact status, select your outgoing account, then click **Watch status**
-next to a contact in **Contacts**. The received state, note and
-source appear below the contact; `swyx-classic` identifies a Swyx status payload.
+Contacts show the status of internal colleagues automatically: while you browse
+or search the phonebook, Voiper subscribes to the extensions of the displayed
+contacts through the selected outgoing account (at most 100 at a time; the least
+recently shown are released first). The colored status and the colleague's status
+text appear on each contact card. Short numeric addresses count as extensions;
+mobile and external numbers are marked separately.
 Configure the provider under **Accounts → Edit → Provider compatibility and
 voicemail → Presence** (Automatic or Swyx for this adapter).
 
@@ -194,13 +197,12 @@ The app's **Do not disturb** switch controls local incoming-call handling separa
 The left navigation collapses to icons in smaller windows. **Overview** combines
 the dialer and active calls with a short recent-people list. Selecting a recent
 person fills the number and outgoing account; press **Call** to dial. The full
-phonebook, search and presence watches remain in **Contacts**.
+phonebook, search and colleague status remain in **Contacts**.
 
 Connection details, logs and diagnostic export are available from the three
 icons at the bottom right. The live panel closes with its close button or Escape.
 
-Choose Standard, Dialog/busy-lamp, Swyx or Disabled per account and use **Watch
-status** on a contact; **Stop watching** removes the watch. Status publication
+Choose Standard, Dialog/busy-lamp, Swyx or Disabled per account. Status publication
 uses standard PIDF PUBLISH, refreshes using the server-granted lifetime, and recovers
 expired tags and transient failures. **Stop publishing** withdraws it; disabling an
 account attempts withdrawal before closing signaling. Authentication/permission
@@ -219,8 +221,11 @@ server name. No live Swyx server was available for validation.
 
 ## Contacts and company directory
 
-CSV and vCard imports preview additions, duplicates and invalid records before an
-atomic commit. Foreign CSV exports can map first/last name, primary number, notes
+Contacts are stored in `contacts.toml` (see [Data and diagnostics](#data-and-diagnostics)).
+Swyx phonebook exports (XML), CSV and vCard are import formats only: imports
+preview additions, duplicates and invalid records before an atomic commit. A Swyx
+export keeps display names and companies; the number with published presence
+becomes the primary address and mobile numbers are added with a Mobile label. Foreign CSV exports can map first/last name, primary number, notes
 and up to twenty additional number columns with labels. Mapping uses explicit
 comma-separated headers, groups one source row into one contact, and keeps empty
 number rows visible as errors. Both input and mapped output are limited to 4 MiB;
@@ -257,17 +262,30 @@ Accounts live in `$XDG_CONFIG_HOME/voiper/accounts` (normally
 `~/.config/voiper/accounts`); audio settings use `voiper/audio.json` and desktop preferences use
 `voiper/preferences.json`. Optional desktop-wallet storage keeps the SIP password
 out of the account file; whole-profile encryption is a separate option.
-Contacts, history and messages live in
+Contacts live in `$XDG_CONFIG_HOME/voiper/contacts.toml` as `[[contacts]]`
+entries with `name`, `company`, `address`, optional `[[contacts.numbers]]` and
+personal fields. Voiper rewrites the file atomically on changes, so edit it while
+Voiper is closed; an unreadable file is reported instead of being replaced.
+Contacts from earlier versions move there from the database on first start.
+History, messages and the directory-sync cache live in
 `$XDG_DATA_HOME/voiper/voiper.db` (normally `~/.local/share/voiper/voiper.db`).
 Use `voiper --base /path/to/accounts` for existing TOML/encrypted account files.
-Back up that account directory and the database with the app closed.
+Back up that account directory, `contacts.toml` and the database with the app closed.
 Changing encryption modes requires a different account name, preventing accidental
 plaintext copies of an encrypted account under the same name.
 
 The package excludes repository `configs/` from its build inputs, but a flake
 source snapshot can still enter the Nix store. Keep real credentials outside the
-checkout. Account encryption covers account files, not the contacts/message
-SQLite database or user-selected WAV recordings.
+checkout. Account encryption covers account files, not contacts, the message database
+or user-selected WAV recordings.
+
+The package installs third-party licenses under `share/licenses/voiper`:
+`go/` holds the license of every Go module linked into the binary, collected
+with [go-licenses](https://github.com/google/go-licenses) (`go/licenses.csv`
+summarizes them), plus the Go standard library license; `frontend/` holds the
+licenses reported by `pnpm licenses` for all frontend packages, including build
+tools (`frontend/licenses.json`). Native libraries such as GTK, WebKitGTK, Opus
+and SpeexDSP are linked dynamically from their own Nix packages.
 
 Call statistics are opt-in in the Phone view. Missing-packet warnings distinguish
 hold, negotiated one-way media and device failure, and allow a startup/resume grace

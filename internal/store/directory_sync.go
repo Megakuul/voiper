@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -93,7 +94,19 @@ func (s *Store) SaveDirectoryProfile(p DirectoryProfile) error {
 	if old.URL != p.URL || old.BaseDN != p.BaseDN || old.BindDN != p.BindDN {
 		// Changing the directory keeps its old contacts as an imported snapshot.
 		// The new server can never delete contacts belonging to the old server.
-		if _, err = tx.Exec(`UPDATE contacts SET source='directory' WHERE source='directory-sync'; DELETE FROM directory_entries; DELETE FROM settings WHERE key='directory-status'`); err != nil {
+		if _, err = tx.Exec(`DELETE FROM directory_entries; DELETE FROM settings WHERE key='directory-status'`); err != nil {
+			return err
+		}
+		err = s.updateContacts(func(contacts []Contact) ([]Contact, error) {
+			for i := range contacts {
+				if contacts[i].Source == "directory-sync" {
+					contacts[i].Source = "directory"
+				}
+				contacts[i].DirectoryID = ""
+			}
+			return contacts, nil
+		})
+		if err != nil {
 			return err
 		}
 	}
@@ -173,98 +186,15 @@ func (s *Store) ApplyDirectory(profile DirectoryProfile, result DirectoryResult,
 		status.Entries = len(result.Contacts)
 		status.Partial = result.Truncated || result.Skipped > 0
 		status.Preserved = 0
-		for _, c := range result.Contacts {
-			var id sql.NullInt64
-			var hidden bool
-			err = tx.QueryRow(`SELECT contact_id,hidden FROM directory_entries WHERE remote_id=?`, c.DirectoryID).Scan(&id, &hidden)
-			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				return err
-			}
-			payload, err := json.Marshal(c)
-			if err != nil {
-				return err
-			}
-			var source string
-			if id.Valid {
-				if err = tx.QueryRow(`SELECT source FROM contacts WHERE id=?`, id.Int64).Scan(&source); err != nil {
-					return err
-				}
-			}
-			if hidden || (id.Valid && source != "directory-sync") {
-				status.Preserved++
-			} else {
-				// A directory may reuse a number or contain duplicate numbers. Never
-				// replace a different contact merely because its address now matches.
-				var conflict int64
-				err = tx.QueryRow(`SELECT id FROM contacts WHERE address=? AND id<>?`, c.Address, id.Int64).Scan(&conflict)
-				if err != nil && !errors.Is(err, sql.ErrNoRows) {
-					return err
-				}
-				if err == nil {
-					status.Preserved++
-				} else {
-					if id.Valid {
-						_, err = tx.Exec(`UPDATE contacts SET name=?,address=?,updated=? WHERE id=?`, c.Name, c.Address, now.Format(time.RFC3339Nano), id.Int64)
-					} else {
-						var inserted sql.Result
-						inserted, err = tx.Exec(`INSERT INTO contacts(name,address,source,updated) VALUES(?,?,'directory-sync',?)`, c.Name, c.Address, now.Format(time.RFC3339Nano))
-						if err == nil {
-							id.Int64, err = inserted.LastInsertId()
-							id.Valid = true
-						}
-					}
-					if err != nil {
-						return err
-					}
-					if _, err = tx.Exec(`DELETE FROM contact_numbers WHERE contact_id=?`, id.Int64); err != nil {
-						return err
-					}
-					for i, n := range c.Numbers {
-						if _, err = tx.Exec(`INSERT INTO contact_numbers(contact_id,label,address,position) VALUES(?,?,?,?)`, id.Int64, n.Label, n.Address, i); err != nil {
-							return err
-						}
-					}
-				}
-			}
-			if _, err = tx.Exec(`INSERT INTO directory_entries(remote_id,contact_id,payload,hidden) VALUES(?,?,?,?) ON CONFLICT(remote_id) DO UPDATE SET contact_id=excluded.contact_id,payload=excluded.payload`, c.DirectoryID, id, string(payload), hidden); err != nil {
-				return err
-			}
-		}
-		if !status.Partial {
-			rows, err := tx.Query(`SELECT remote_id,contact_id FROM directory_entries WHERE hidden=0`)
-			if err != nil {
-				return err
-			}
-			type removed struct {
-				remote string
-				id     sql.NullInt64
-			}
-			missing := []removed{}
-			for rows.Next() {
-				var item removed
-				if err = rows.Scan(&item.remote, &item.id); err != nil {
-					rows.Close()
-					return err
-				}
-				if !seen[item.remote] {
-					missing = append(missing, item)
-				}
-			}
-			err = rows.Err()
-			rows.Close()
-			if err != nil {
-				return err
-			}
-			for _, item := range missing {
-				if _, err = tx.Exec(`DELETE FROM directory_entries WHERE remote_id=?`, item.remote); err != nil {
-					return err
-				}
-				if item.id.Valid {
-					if _, err = tx.Exec(`DELETE FROM contacts WHERE id=? AND source='directory-sync'`, item.id.Int64); err != nil {
-						return err
-					}
-				}
-			}
+		// Contacts are written before the entry cache commits. If the commit fails,
+		// the next refresh finds the written contacts by address and preserves them.
+		err = s.updateContacts(func(contacts []Contact) ([]Contact, error) {
+			contacts, preserved, err := applyDirectoryContacts(tx, contacts, result.Contacts, seen, !status.Partial, now)
+			status.Preserved = preserved
+			return contacts, err
+		})
+		if err != nil {
+			return err
 		}
 	}
 	encoded, err := json.Marshal(status)
@@ -277,47 +207,108 @@ func (s *Store) ApplyDirectory(profile DirectoryProfile, result DirectoryResult,
 	return tx.Commit()
 }
 
+// applyDirectoryContacts merges one refresh into contacts and the entry cache.
+// Entries the user deleted (hidden) or edited (no longer directory-sync) are
+// preserved, as is any contact whose number a directory entry would take over.
+func applyDirectoryContacts(tx *sql.Tx, contacts []Contact, entries []Contact, seen map[string]bool, complete bool, now time.Time) ([]Contact, int, error) {
+	preserved := 0
+	for _, c := range entries {
+		var hidden bool
+		err := tx.QueryRow(`SELECT hidden FROM directory_entries WHERE remote_id=?`, c.DirectoryID).Scan(&hidden)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, err
+		}
+		payload, err := json.Marshal(c)
+		if err != nil {
+			return nil, 0, err
+		}
+		index := slices.IndexFunc(contacts, func(other Contact) bool { return other.DirectoryID == c.DirectoryID })
+		conflict := slices.ContainsFunc(contacts, func(other Contact) bool {
+			return other.Address == c.Address && other.DirectoryID != c.DirectoryID
+		})
+		switch {
+		case hidden || (index >= 0 && contacts[index].Source != "directory-sync") || conflict:
+			preserved++
+		case index >= 0:
+			existing := &contacts[index]
+			existing.Name, existing.Address, existing.Numbers, existing.Updated = c.Name, c.Address, trimNumbers(c.Numbers), now
+		default:
+			contacts = append(contacts, Contact{ID: nextContactID(contacts), Name: c.Name, Address: c.Address, Numbers: trimNumbers(c.Numbers), Source: "directory-sync", DirectoryID: c.DirectoryID, Updated: now})
+		}
+		if _, err = tx.Exec(`INSERT INTO directory_entries(remote_id,payload,hidden) VALUES(?,?,?) ON CONFLICT(remote_id) DO UPDATE SET payload=excluded.payload`, c.DirectoryID, string(payload), hidden); err != nil {
+			return nil, 0, err
+		}
+	}
+	if !complete {
+		return contacts, preserved, nil
+	}
+	// Only a complete scan proves that an entry left the directory.
+	rows, err := tx.Query(`SELECT remote_id FROM directory_entries WHERE hidden=0`)
+	if err != nil {
+		return nil, 0, err
+	}
+	var missing []string
+	for rows.Next() {
+		var remote string
+		if err = rows.Scan(&remote); err != nil {
+			rows.Close()
+			return nil, 0, err
+		}
+		if !seen[remote] {
+			missing = append(missing, remote)
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, remote := range missing {
+		if _, err = tx.Exec(`DELETE FROM directory_entries WHERE remote_id=?`, remote); err != nil {
+			return nil, 0, err
+		}
+		contacts = slices.DeleteFunc(contacts, func(c Contact) bool { return c.DirectoryID == remote && c.Source == "directory-sync" })
+	}
+	return contacts, preserved, nil
+}
+
 // RestoreDirectoryContact discards local name/number changes in favor of the
 // latest cached remote entry. Personal notes, favorites and account stay local.
 func (s *Store) RestoreDirectoryContact(id int64) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
+	// Read the cached entry before taking contactsMu; see Store for lock order.
+	s.contactsMu.Lock()
+	index := slices.IndexFunc(s.contacts, func(c Contact) bool { return c.ID == id })
+	directoryID := ""
+	if index >= 0 {
+		directoryID = s.contacts[index].DirectoryID
 	}
-	defer tx.Rollback()
+	s.contactsMu.Unlock()
 	var raw string
-	err = tx.QueryRow(`SELECT payload FROM directory_entries WHERE contact_id=? AND hidden=0`, id).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
+	err := s.db.QueryRow(`SELECT payload FROM directory_entries WHERE remote_id=? AND hidden=0`, directoryID).Scan(&raw)
+	if directoryID == "" || errors.Is(err, sql.ErrNoRows) {
 		return errors.New("this contact no longer has a directory entry")
 	}
 	if err != nil {
 		return err
 	}
-	var contact Contact
-	if err = json.Unmarshal([]byte(raw), &contact); err != nil {
+	var remote Contact
+	if err = json.Unmarshal([]byte(raw), &remote); err != nil {
 		return err
 	}
-	if err = validContact(contact); err != nil {
+	if err = validContact(remote); err != nil {
 		return err
 	}
-	var conflict int64
-	err = tx.QueryRow(`SELECT id FROM contacts WHERE address=? AND id<>?`, contact.Address, id).Scan(&conflict)
-	if err == nil {
-		return errors.New("another contact already uses the directory number")
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-	if _, err = tx.Exec(`UPDATE contacts SET name=?,address=?,source='directory-sync',updated=? WHERE id=?`, contact.Name, contact.Address, time.Now().Format(time.RFC3339Nano), id); err != nil {
-		return err
-	}
-	if _, err = tx.Exec(`DELETE FROM contact_numbers WHERE contact_id=?`, id); err != nil {
-		return err
-	}
-	for i, n := range contact.Numbers {
-		if _, err = tx.Exec(`INSERT INTO contact_numbers(contact_id,label,address,position) VALUES(?,?,?,?)`, id, n.Label, n.Address, i); err != nil {
-			return err
+	return s.updateContacts(func(contacts []Contact) ([]Contact, error) {
+		index := slices.IndexFunc(contacts, func(c Contact) bool { return c.ID == id && c.DirectoryID == directoryID })
+		if index < 0 {
+			return nil, errors.New("contact changed while restoring; try again")
 		}
-	}
-	return tx.Commit()
+		if slices.ContainsFunc(contacts, func(c Contact) bool { return c.Address == remote.Address && c.ID != id }) {
+			return nil, errors.New("another contact already uses the directory number")
+		}
+		restored := &contacts[index]
+		restored.Name, restored.Address, restored.Numbers = remote.Name, remote.Address, trimNumbers(remote.Numbers)
+		restored.Source, restored.Updated = "directory-sync", time.Now()
+		return contacts, nil
+	})
 }

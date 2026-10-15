@@ -2,12 +2,15 @@ package store
 
 import (
 	"database/sql"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func TestUpgradePreservesContactsAndMarksOldMessagesRead(t *testing.T) {
+func TestUpgradeMovesContactsToTOMLAndMarksOldMessagesRead(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "old.db")
+	contactsPath := filepath.Join(t.TempDir(), "contacts.toml")
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		t.Fatal(err)
@@ -22,11 +25,19 @@ PRAGMA user_version=1;`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open(path)
+	s, err := Open(path, contactsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
+	saved, err := os.ReadFile(contactsPath)
+	if err != nil || !strings.Contains(string(saved), `address = "100"`) {
+		t.Fatalf("contacts file: %s %v", saved, err)
+	}
+	var remaining int
+	if err = s.db.QueryRow("SELECT count(*) FROM contacts").Scan(&remaining); err != nil || remaining != 0 {
+		t.Fatalf("contacts left in database: %d %v", remaining, err)
+	}
 	contacts, err := s.Contacts("")
 	if err != nil || len(contacts) != 1 || !contacts[0].Favorite {
 		t.Fatalf("contacts lost: %+v %v", contacts, err)
@@ -45,13 +56,18 @@ PRAGMA user_version=1;`)
 	if err = s.DeleteContact(contacts[0].ID); err != nil {
 		t.Fatal(err)
 	}
-	var orphans int
-	if err = s.db.QueryRow("SELECT count(*) FROM contact_numbers").Scan(&orphans); err != nil || orphans != 0 {
-		t.Fatalf("orphaned numbers: %d %v", orphans, err)
+	s.Close()
+	// Reopening reads the file again and must not repeat the migration.
+	s, err = Open(path, contactsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contacts, err = s.Contacts(""); err != nil || len(contacts) != 0 {
+		t.Fatalf("deleted contact returned: %+v %v", contacts, err)
 	}
 }
 func TestReadCursorDoesNotMarkNewArrivalsRead(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "messages.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "messages.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}

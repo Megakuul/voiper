@@ -1,67 +1,112 @@
-// Shared Tailwind utilities for controls used throughout the application.
+// Shared Tailwind class lists. Pages use these names instead of repeating long
+// utility strings; colors come from the theme tokens in app.css.
+//
+// Some lists keep a plain marker class (panel, row, stack) because parents
+// space their children with selectors such as [&>.row+.row].
+
 const control = `
-    outline-offset-3 cursor-pointer leading-[1.4] transition-colors duration-150 disabled:opacity-[0.45]
-    disabled:cursor-not-allowed [&:active:not(:disabled)]:shadow-[inset_0_1px_3px_#0004]
-  `;
+  cursor-pointer outline-offset-3 leading-[1.4] transition-colors duration-150
+  disabled:cursor-not-allowed disabled:opacity-[0.45]
+  enabled:active:shadow-[inset_0_1px_3px_#0004]
+`;
+
+const button = `
+  ${control} min-h-[38px] px-4 py-[0.65rem] rounded-[6px] border font-medium
+`;
+
+const input = `
+  min-w-0 w-full min-h-[42px] rounded-[6px] border border-field-border bg-field text-foreground
+  outline-offset-3 placeholder:text-[#858d99]
+  focus:border-transparent focus:outline-2 focus:outline-solid focus:outline-accent
+  file:mr-3 file:cursor-pointer file:rounded-[4px] file:border-0 file:bg-control-hover
+  file:px-3 file:py-2 file:text-inherit [&[type='file']]:p-2
+`;
+
+// Card container. A leading h2 becomes the card header with a divider, and
+// stacked buttons and rows get breathing room.
+const card = `
+  panel min-w-0 rounded-[6px] border border-border border-t-panel-edge bg-surface p-6 shadow-panel
+  max-[700px]:p-[1.15rem]
+  [&>h2:first-child]:pb-4 [&>h2:first-child]:border-b [&>h2:first-child]:border-border
+  [&>button+button]:mt-4 [&>.row+.row]:mt-4
+  [&_form+details_button]:m-0 [&_form+details_button]:mt-2 [&_form+details_button]:mr-2
+`;
 
 export const ui = {
+  control,
+
+  button: `
+    ${button} bg-control text-inherit border-control-border shadow-control
+    enabled:hover:bg-control-hover enabled:hover:border-control-border-hover
+  `,
+  primaryButton: `
+    ${button} primary bg-brand text-white font-semibold border-brand-border shadow-control
+    enabled:hover:bg-brand-hover
+  `,
+  quietButton: `
+    ${button} quiet bg-transparent text-muted border-control-border
+    enabled:hover:bg-control-hover enabled:hover:border-control-border-hover
+  `,
+  dangerButton: `
+    ${button} danger bg-[#382027] text-[#ffc2cc] border-[#70414c] shadow-control
+    enabled:hover:bg-control-hover enabled:hover:border-control-border-hover
+  `,
+  // Square, borderless button holding a single 18px icon.
+  iconButton: `
+    ${control} inline-flex items-center justify-center size-[32px] min-h-[32px] p-[6px] rounded-[4px]
+    border border-transparent bg-transparent text-muted font-medium
+    enabled:hover:bg-control-hover enabled:hover:border-control-border-hover
+    [&.active]:bg-accent-surface [&.active]:border-brand-border [&.active]:text-accent-text
+    [&_svg]:size-[18px] [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-[1.6]
+    [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]
+  `,
+
+  input,
+  // Text input with the standard inner spacing.
+  field: `${input} px-[0.8rem] py-[0.65rem]`,
+  textarea: `${input} min-h-[90px] px-[0.8rem] py-[0.65rem] resize-y`,
   checkbox: `
-    appearance-none size-[20px] min-h-[20px] flex-[0_0_20px] m-0 p-0 border border-[#697583] rounded-[4px] bg-[#1c252e]
-    bg-center bg-no-repeat bg-size-[14px_14px] shadow-none cursor-pointer transition-colors duration-150
+    appearance-none size-[20px] min-h-[20px] flex-[0_0_20px] m-0 p-0 rounded-[4px] border border-[#697583]
+    bg-field bg-center bg-no-repeat bg-size-[14px_14px] shadow-none cursor-pointer
+    transition-colors duration-150
     checked:border-accent checked:bg-brand indeterminate:border-accent indeterminate:bg-brand
-    enabled:hover:border-accent-text focus:border-accent focus:outline-none focus-visible:outline-2
-    focus-visible:outline-solid focus-visible:outline-accent focus-visible:outline-offset-3
-    disabled:opacity-40 disabled:cursor-not-allowed
+    enabled:hover:border-accent-text focus:border-accent focus:outline-none
+    focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-accent focus-visible:outline-offset-3
+    disabled:cursor-not-allowed disabled:opacity-40
   `,
   range: `
     appearance-none w-full min-w-0 min-h-[28px] p-0 border-0 bg-transparent cursor-pointer outline-offset-3
-    focus:outline-2 focus:outline-solid focus:outline-accent disabled:opacity-40
-    disabled:cursor-not-allowed
+    focus:outline-2 focus:outline-solid focus:outline-accent
+    disabled:cursor-not-allowed disabled:opacity-40
   `,
 
-  button: `
-    ${control} px-4 py-[0.65rem] rounded-[6px] bg-[#35424e] text-inherit min-h-[38px] shadow-control
-    font-medium border border-[#536271] [&:hover:not(:disabled)]:bg-[#435362]
-    [&:hover:not(:disabled)]:border-[#727e8d]
-  `,
-  h2: `
-    mx-0 mt-0 mb-4 text-[1.15rem] font-semibold
-  `,
-  control,
-  dangerButton: `
-    px-4 py-[0.65rem] outline-offset-3 cursor-pointer rounded-[6px] bg-[#382027] text-[#ffc2cc] min-h-[38px]
-    shadow-control font-medium leading-[1.4] transition-colors duration-150 border border-[#70414c]
-    disabled:opacity-[0.45] disabled:cursor-not-allowed [&:hover:not(:disabled)]:bg-[#435362]
-    [&:hover:not(:disabled)]:border-[#727e8d]
-    [&:active:not(:disabled)]:[box-shadow:inset_0_1px_3px_#0004]
-  `,
-  input: `
-    outline-offset-3 min-w-0 w-full min-h-[42px] rounded-[6px] bg-[#1c252e] text-[#eef0f3] border
-    border-[#4b5a68] placeholder:text-[#858d99] focus:outline-2 focus:outline-solid focus:outline-accent
-    focus:border-transparent [&[type='file']]:p-2 [&::file-selector-button]:px-3
-    [&::file-selector-button]:py-2 [&::file-selector-button]:rounded-[4px]
-    [&::file-selector-button]:bg-[#435362] [&::file-selector-button]:text-inherit
-    [&::file-selector-button]:mr-3 [&::file-selector-button]:cursor-pointer
-    [&::file-selector-button]:border-0
-  `,
-  quietButton: `
-    px-4 py-[0.65rem] outline-offset-3 cursor-pointer rounded-[6px] bg-transparent text-muted min-h-[38px]
-    shadow-none font-medium leading-[1.4] transition-colors duration-150 border border-[#536271]
-    disabled:opacity-[0.45] disabled:cursor-not-allowed [&:hover:not(:disabled)]:bg-[#435362]
-    [&:hover:not(:disabled)]:border-[#727e8d]
-    [&:active:not(:disabled)]:[box-shadow:inset_0_1px_3px_#0004]
-  `,
-  primaryButton: `
-    px-4 py-[0.65rem] outline-offset-3 cursor-pointer rounded-[6px] bg-brand text-white min-h-[38px]
-    shadow-control font-semibold leading-[1.4] transition-colors duration-150 border border-brand-border
-    disabled:opacity-[0.45] disabled:cursor-not-allowed hover:enabled:bg-brand-hover
-    hover:enabled:border-brand-border [&:active:not(:disabled)]:[box-shadow:inset_0_1px_3px_#0004]
-  `,
+  // A label stacked above its control.
+  label: "flex flex-col gap-2 text-[0.9rem] text-label",
+  // A label beside a checkbox or radio button.
+  checkLabel: "flex flex-row items-center gap-[0.65rem] min-h-[32px] text-[0.9rem] text-label cursor-pointer",
+
+  text: "m-0 leading-[1.6]",
+  hint: "m-0 leading-[1.6] text-[0.78rem] text-muted",
+  error: "m-0 leading-[1.6] text-danger",
+  empty: "m-0 px-0 py-8 leading-[1.6] text-center text-muted",
+  badge: "px-[0.7rem] py-[0.3rem] rounded-[4px] bg-control-hover text-xs",
+
+  h2: "mx-0 mt-0 mb-4 text-[1.15rem] font-semibold",
+  h3: "m-0 text-base font-semibold",
+
+  card,
+  // Card whose direct paragraphs are spaced apart.
+  panel: `${card} [&>p]:mb-4`,
+  // Controls in a line. Buttons keep their width; on narrow windows the line
+  // wraps and elements marked .grow take the remaining space.
+  row: "row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&>button]:shrink-0 max-[700px]:[&>.grow]:basis-[180px]",
+  stack: "stack flex flex-col gap-4",
+
   details: `
-    [&_>_label]:mt-4 [&_>_form]:mt-4 [&_>_fieldset]:mt-4 [&_>_button]:mr-2 [&_>_.row_>_button]:shrink-0
-    [&_>_:not(summary)_+_:not(summary)]:mt-4 [&:not([open])_>_summary]:mb-0
+    [&>label]:mt-4 [&>form]:mt-4 [&>fieldset]:mt-4 [&>button]:mr-2 [&>.row>button]:shrink-0
+    [&>:not(summary)+:not(summary)]:mt-4 [&:not([open])>summary]:mb-0
   `,
-  summary: `
-    outline-offset-3 cursor-pointer text-[#d1dce5] mb-[0.8rem] list-none
-  `,
+  summary: "list-none mb-[0.8rem] py-1 text-[#d1dce5] cursor-pointer outline-offset-3",
+  // Bordered disclosure section inside a panel.
+  section: "mt-[1.3rem] pt-4 border-t border-border",
 };

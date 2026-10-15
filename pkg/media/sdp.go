@@ -292,6 +292,11 @@ func negotiate(data []byte, formats []codec.Format) (description, error) {
 		if err != nil {
 			return result, errors.New("invalid RTP payload type")
 		}
+		// Some endpoints describe G.722 by its 16 kHz sample rate instead of
+		// the 8000 RTP clock rate that RFC 3551 assigns for compatibility.
+		if pt == 9 && strings.EqualFold(fields[1], "G722/16000") {
+			fields[1] = "G722/8000"
+		}
 		if pt == 0 || pt == 8 || pt == 9 {
 			expected := mapping[uint8(pt)]
 			if !strings.EqualFold(fields[1], expected) && !strings.EqualFold(fields[1], expected+"/1") {

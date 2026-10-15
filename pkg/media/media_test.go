@@ -190,17 +190,69 @@ func TestDeviceOpeningDoesNotBlockStatsOrHangup(t *testing.T) {
 	}
 }
 
-func TestAnswerCannotInventPayloadMapping(t *testing.T) {
-	call, err := NewCall(context.Background(), "mapping", Settings{BindAddress: "127.0.0.1:0", Codecs: []string{"PCMA"}}, nil)
+func TestAnswerMayRenumberSelectedCodec(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	settings := Settings{BindAddress: "127.0.0.1:0", Codecs: []string{"PCMA"}}
+	a, err := NewCall(ctx, "a", settings, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	a.openAudio = syntheticAudio
+	offer := a.LocalSDP("127.0.0.1")
+	b, err := NewCall(ctx, "b", settings, offer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	b.openAudio = syntheticAudio
+	if err = b.Connect(offer); err != nil {
+		t.Fatal(err)
+	}
+	// RFC 3264 lets the answer number PCMA 105; b still sends with the offered 8.
+	answer := strings.Replace(string(b.LocalSDP("127.0.0.1")), "RTP/AVP 8 101", "RTP/AVP 105 101", 1)
+	answer = strings.Replace(answer, "a=rtpmap:8 PCMA", "a=rtpmap:105 PCMA", 1)
+	if err = a.Connect([]byte(answer)); err != nil {
+		t.Fatal(err)
+	}
+	frame := make([]byte, 320)
+	for i := 0; i < len(frame); i += 2 {
+		binary.LittleEndian.PutUint16(frame[i:], 1000)
+	}
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+	output := make([]byte, 320)
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatal("audio sent with the offered payload number was not played")
+		case <-ticker.C:
+			b.stream.Capture.Write(frame)
+			n := a.stream.Playback.Read(output)
+			for i := 0; i+1 < n; i += 2 {
+				if int16(binary.LittleEndian.Uint16(output[i:])) > 500 {
+					return
+				}
+			}
+		}
+	}
+}
+
+func TestAnswerMayListUnofferedCodecs(t *testing.T) {
+	call, err := NewCall(context.Background(), "extra", Settings{BindAddress: "127.0.0.1:0", Codecs: []string{"PCMA"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer call.Close()
-	offer := string(call.LocalSDP("127.0.0.1"))
-	changed := strings.Replace(offer, "RTP/AVP 8 101", "RTP/AVP 105 101", 1)
-	changed = strings.Replace(changed, "a=rtpmap:8 PCMA", "a=rtpmap:105 PCMA", 1)
-	if err = call.Connect([]byte(changed)); err == nil {
-		t.Fatal("accepted an unoffered payload mapping")
+	call.LocalSDP("127.0.0.1")
+	// Shaped like a PBX client answering with its whole codec list and its own
+	// telephone-event number, both permitted by RFC 3264 section 6.1.
+	answer := []byte("v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=pbx\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\n" +
+		"m=audio 3000 RTP/AVP 8 18 9 96\r\na=rtpmap:8 PCMA/8000\r\na=rtpmap:18 G729/8000\r\n" +
+		"a=rtpmap:9 G722/16000\r\na=rtpmap:96 telephone-event/8000\r\na=fmtp:96 0-15\r\n")
+	if err = call.ValidateAnswer(answer); err != nil {
+		t.Fatal(err)
 	}
 }
 

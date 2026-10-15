@@ -16,7 +16,7 @@ import (
 
 func testManager(t *testing.T) *Manager {
 	t.Helper()
-	database, err := store.Open(filepath.Join(t.TempDir(), "phone.sqlite"))
+	database, err := store.Open(filepath.Join(t.TempDir(), "phone.sqlite"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}

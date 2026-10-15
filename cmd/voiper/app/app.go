@@ -79,7 +79,7 @@ func (a *App) startup(ctx context.Context) {
 		}
 		dataRoot = filepath.Join(home, ".local", "share")
 	}
-	a.store, err = store.Open(filepath.Join(dataRoot, "voiper", "voiper.db"))
+	a.store, err = store.Open(filepath.Join(dataRoot, "voiper", "voiper.db"), filepath.Join(configRoot, "voiper", "contacts.toml"))
 	if err != nil {
 		a.startupError = err
 		return

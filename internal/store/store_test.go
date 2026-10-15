@@ -6,7 +6,7 @@ import (
 )
 
 func TestImportIsAtomicAndPreservesContacts(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestImportIsAtomicAndPreservesContacts(t *testing.T) {
 }
 
 func TestCSVRoundTripKeepsMultipleNumbersTogether(t *testing.T) {
-	source, err := Open(filepath.Join(t.TempDir(), "source.db"))
+	source, err := Open(filepath.Join(t.TempDir(), "source.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestCSVRoundTripKeepsMultipleNumbersTogether(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	destination, err := Open(filepath.Join(t.TempDir(), "destination.db"))
+	destination, err := Open(filepath.Join(t.TempDir(), "destination.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}

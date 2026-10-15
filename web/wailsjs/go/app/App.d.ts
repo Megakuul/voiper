@@ -167,4 +167,6 @@ export function UnwatchPresence(arg1:string,arg2:string):Promise<void>;
 
 export function WatchPresence(arg1:string,arg2:string):Promise<void>;
 
+export function WatchVisiblePresence(arg1:string,arg2:Array<string>):Promise<void>;
+
 export function WatchVoicemail(arg1:string):Promise<void>;

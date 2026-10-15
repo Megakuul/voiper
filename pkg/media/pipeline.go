@@ -12,17 +12,20 @@ import (
 )
 
 type mediaPipeline struct {
-	encoderBitrate                      atomic.Int64
-	ctx                                 context.Context
-	cancel                              context.CancelFunc
-	workers                             sync.WaitGroup
-	coder                               codec.Codec
-	format                              codec.Format
+	encoderBitrate atomic.Int64
+	ctx            context.Context
+	cancel         context.CancelFunc
+	workers        sync.WaitGroup
+	coder          codec.Codec
+	format         codec.Format
+	// receivePayloadType is the number our offer gave the codec. RFC 3264 lets an
+	// answer choose another number for the packets we send; the peer still sends ours.
+	receivePayloadType                  uint8
 	deviceRate                          int
 	captureConverter, playbackConverter *audio.Resampler
 }
 
-func newPipeline(ctx context.Context, format codec.Format, deviceRate int) (*mediaPipeline, error) {
+func newPipeline(ctx context.Context, format codec.Format, receivePayloadType uint8, deviceRate int) (*mediaPipeline, error) {
 	coder, err := codec.New(format)
 	if err != nil {
 		return nil, err
@@ -37,7 +40,7 @@ func newPipeline(ctx context.Context, format codec.Format, deviceRate int) (*med
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	return &mediaPipeline{ctx: ctx, cancel: cancel, coder: coder, format: format, deviceRate: deviceRate, captureConverter: capture, playbackConverter: playback}, nil
+	return &mediaPipeline{ctx: ctx, cancel: cancel, coder: coder, format: format, receivePayloadType: receivePayloadType, deviceRate: deviceRate, captureConverter: capture, playbackConverter: playback}, nil
 }
 func (p *mediaPipeline) close() {
 	p.cancel()

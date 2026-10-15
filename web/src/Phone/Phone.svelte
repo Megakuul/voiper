@@ -2,6 +2,8 @@
   import { ui } from "../ui.js";
   import Icon from "../components/Icon.svelte";
   import Dropdown from "../components/Dropdown.svelte";
+  import ContactCard from "../Contacts/ContactCard.svelte";
+  import { extensionOf } from "../Contacts/presence.js";
   import * as api from "../../wailsjs/go/app/App.js";
   let {
     snapshot,
@@ -34,6 +36,23 @@
       clearTimeout(timer);
     };
   });
+  let presenceByTarget = $derived(
+    new Map(
+      (snapshot.Presence || [])
+        .filter((p) => p.Account === account && !p.Voicemail)
+        .map((p) => [p.Target, p]),
+    ),
+  );
+  let accountRegistered = $derived(
+    snapshot.Accounts.some((a) => a.Name === account && a.State === "registered"),
+  );
+  $effect(() => {
+    const extensions = suggestions.map(extensionOf).filter(Boolean);
+    if (account && accountRegistered && extensions.length)
+      api.WatchVisiblePresence(account, extensions).catch((e) => (contactError = String(e)));
+  });
+  const statRow = "flex justify-between gap-4 py-[0.6rem] border-b border-border";
+  const statValue = "m-0 min-w-0 text-right wrap-anywhere";
   let transfer = $state({});
   let tones = $state({});
   let toneNotices = $state({});
@@ -165,12 +184,10 @@
 </script>
 
 <div class={["flex flex-col", workspace ? "gap-0" : "gap-6"]}>
-  <section class="[&_>_div_>_h2]:m-0 [&:not(.has-calls)]:order-[1]" class:has-calls={snapshot.Calls.length > 0}>
+  <!-- Without calls, the dialer comes first. -->
+  <section class={snapshot.Calls.length === 0 && "order-1"}>
     {#if snapshot.Calls.filter((c) => c.State === "connected").length >= 2 || hasConference}<div
-        class="
-          row flex items-center gap-[0.7rem] flex-wrap max-[700px]:flex-wrap [&_>_button]:shrink-0
-          max-[700px]:[&_>_.grow]:basis-[180px]
-        "
+        class={[ui.row, "flex-wrap"]}
       >
         <button class={ui.button}
           disabled={busy ||
@@ -185,17 +202,14 @@
             disabled={busy}
             onclick={() => run(() => api.LeaveConference())}
             >Separate conference</button
-          >{:else}<p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+          >{:else}<p class={ui.hint}>
             Merge two or three active calls. Resume held calls before merging.
           </p>{/if}
       </div>{/if}
-    {#if snapshot.Calls.length || !workspace}<div class="
-      row flex items-center gap-4 justify-between flex-wrap wrap-anywhere max-[700px]:flex-wrap
-      [&_>_button]:shrink-0 [&_h2]:m-0 max-[700px]:[&_>_.grow]:basis-[180px]
-    ">
-      <h2 class={ui.h2}>{snapshot.Calls.length ? "Current calls" : "Calls"}</h2>
+    {#if snapshot.Calls.length || !workspace}<div class="flex flex-wrap items-center justify-between gap-4 wrap-anywhere">
+      <h2 class="m-0 text-[1.15rem] font-semibold">{snapshot.Calls.length ? "Current calls" : "Calls"}</h2>
       {#if snapshot.Calls.length}<button
-          class={[ui.quietButton, "quiet"]}
+          class={ui.quietButton}
           aria-pressed={showStats}
           onclick={() => (showStats = !showStats)}
           >{showStats ? "Hide call statistics" : "Show call statistics"}</button
@@ -203,15 +217,15 @@
     </div>
     {/if}
     {#each snapshot.Calls as call (call.ID)}
-      <article class={["min-w-0 rounded-[6px] border border-border [&>p]:mb-4 [&>h2]:mt-4 [&>h2]:wrap-anywhere", workspace ? "p-5 mb-6 bg-surface-inset" : "p-6 mt-4 bg-surface shadow-panel border-t-[#526271] max-[700px]:p-[1.15rem]"]}>
+      <article class={["min-w-0 rounded-[6px] border border-border [&>p]:mb-4", workspace ? "p-5 mb-6 bg-surface-inset" : "p-6 mt-4 bg-surface shadow-panel border-t-panel-edge max-[700px]:p-[1.15rem]"]}>
         <span class="text-muted text-[0.78rem]"
           >{call.Account} · {call.Direction === "incoming"
             ? "Incoming call"
             : "Outgoing call"}</span
         >
-        <h2 class={ui.h2}>{call.Remote}</h2>
-        <div class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]">
-          <span class="px-[0.7rem] py-[0.3rem] rounded-[4px] bg-[#435362] text-xs"
+        <h2 class="mx-0 mt-4 mb-4 text-[1.15rem] font-semibold wrap-anywhere">{call.Remote}</h2>
+        <div class={ui.row}>
+          <span class={ui.badge}
             >{call.Held
               ? "On hold"
               : {
@@ -220,15 +234,15 @@
                   dialing: "Calling…",
                   connecting: "Connecting…",
                 }[call.State] || call.State}</span
-          >{#if call.Muted}<span class="px-[0.7rem] py-[0.3rem] rounded-[4px] bg-[#435362] text-xs">Microphone muted</span
-            >{/if}{#if call.Stats?.Conference}<span class="px-[0.7rem] py-[0.3rem] rounded-[4px] bg-[#435362] text-xs"
+          >{#if call.Muted}<span class={ui.badge}>Microphone muted</span
+            >{/if}{#if call.Stats?.Conference}<span class={ui.badge}
               >Conference</span
             >{/if}
         </div>
-        {#if call.TransferStatus}<p class="m-0 leading-[1.6]" role="status">
+        {#if call.TransferStatus}<p class={ui.text} role="status">
             Transfer: {call.TransferStatus}
           </p>{/if}
-        {#if call.Stats?.AudioStopped}<p class="m-0 leading-[1.6] text-[#f9a8b9]" role="alert">
+        {#if call.Stats?.AudioStopped}<p class={ui.error} role="alert">
             Audio device stopped. {call.Stats.AudioRecovering
               ? "Reconnecting…"
               : call.Stats.AudioRecoveryError ||
@@ -241,17 +255,14 @@
               >Retry audio</button
             >
           </p>{/if}
-        {#if call.Stats?.LastError}<p class="m-0 leading-[1.6] text-[#f9a8b9]" role="alert">
+        {#if call.Stats?.LastError}<p class={ui.error} role="alert">
             Audio: {call.Stats.LastError}
           </p>{/if}
-        {#if call.Stats?.MediaWarning}<p class="m-0 leading-[1.6] text-[#f9a8b9]" role="status">
+        {#if call.Stats?.MediaWarning}<p class={ui.error} role="status">
             {call.Stats.MediaWarning}
           </p>{/if}
         {#if call.State === "connected" && call.Stats?.ICECandidateType}
-          <div class="
-            row flex items-center gap-[0.7rem] flex-wrap max-[700px]:flex-wrap [&_>_button]:shrink-0
-            max-[700px]:[&_>_.grow]:basis-[180px]
-          ">
+          <div class={[ui.row, "flex-wrap"]}>
             <button class={ui.button}
               disabled={busy ||
                 restarting[call.ID] ||
@@ -264,68 +275,55 @@
                 role="status">Checking a new audio path…</span
               >{/if}
           </div>
-          {#if restartErrors[call.ID]}<p class="m-0 leading-[1.6] text-[#f9a8b9]" role="alert">
+          {#if restartErrors[call.ID]}<p class={ui.error} role="alert">
               {restartErrors[call.ID]}
             </p>{/if}
         {/if}
         {#if call.Connected && !call.Connected.startsWith("0001-")}<p
-            class="m-0 leading-[1.6] text-muted text-[0.78rem]"
+            class={ui.hint}
           >
             Connected · {duration(call.Connected)}
           </p>{/if}
-        {#if call.Error}<p class="m-0 leading-[1.6] text-[#f9a8b9]">{call.Error}</p>{/if}
-        <div class="
-          row flex items-center gap-[0.7rem] flex-wrap mt-6 max-[700px]:flex-wrap [&_>_button]:shrink-0
-          max-[700px]:[&_>_.grow]:basis-[180px]
-        ">
+        {#if call.Error}<p class={ui.error}>{call.Error}</p>{/if}
+        <div class={[ui.row, "flex-wrap mt-6"]}>
           {#if call.State === "ringing"}<button
-              class={[ui.primaryButton, "primary"]}
+              class={ui.primaryButton}
               disabled={busy}
               onclick={() => run(() => api.Answer(call.ID))}>Answer</button
             >{/if}
-          {#if call.State === "connected"}<button class={[ui.control, `
-            px-4 py-[0.65rem] rounded-[6px] bg-[#35424e] text-inherit min-h-[38px] shadow-control font-medium border
-            border-[#536271] [&.active]:text-accent-text [&.active]:border-accent
-            [&:hover:not(:disabled)]:bg-[#435362] [&:hover:not(:disabled)]:border-[#727e8d]
-          `]}
-              class:active={call.Muted}
+          {#if call.State === "connected"}<button class={[ui.button, "aria-pressed:text-accent-text aria-pressed:border-accent"]}
               disabled={busy}
               onclick={() => run(() => api.Mute(call.ID, !call.Muted))}
               aria-pressed={call.Muted}
               >{call.Muted ? "Unmute microphone" : "Mute microphone"}</button
-            ><button class={[ui.control, `
-              px-4 py-[0.65rem] rounded-[6px] bg-[#35424e] text-inherit min-h-[38px] shadow-control font-medium border
-              border-[#536271] [&.active]:text-accent-text [&.active]:border-accent
-              [&:hover:not(:disabled)]:bg-[#435362] [&:hover:not(:disabled)]:border-[#727e8d]
-            `]}
-              class:active={call.Held}
+            ><button class={[ui.button, "aria-pressed:text-accent-text aria-pressed:border-accent"]}
               disabled={busy}
               onclick={() => run(() => api.Hold(call.ID, !call.Held))}
               aria-pressed={call.Held}
               >{call.Held ? "Resume call" : "Hold call"}</button
             >{/if}
-          <button class={[ui.dangerButton, "danger"]} onclick={() => run(() => api.Hangup(call.ID))}
+          <button class={ui.dangerButton} onclick={() => run(() => api.Hangup(call.ID))}
             >{call.State === "ringing" ? "Decline" : "Hang up"}</button
           >
         </div>
         {#if call.State === "ringing"}<form
-            class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]"
+            class={ui.row}
             onsubmit={(e) => {
               e.preventDefault();
               run(() => api.Redirect(call.ID, transfer[call.ID] || ""));
             }}
           >
-            <input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+            <input class={ui.field}
               aria-label="Redirect destination"
               placeholder="Redirect destination"
               bind:value={transfer[call.ID]}
             /><button class={ui.button} disabled={busy || !transfer[call.ID]}>Redirect</button>
           </form>{/if}
         {#if call.State === "connected"}
-          <details class={[ui.details, "mt-5 border-t border-t-border pt-4"]}>
-            <summary class={[ui.summary, "px-0 py-1"]}>Phone menu (DTMF)</summary>
+          <details class={[ui.details, "mt-5 pt-4 border-t border-border"]}>
+            <summary class={ui.summary}>Phone menu (DTMF)</summary>
             <form
-              class="stack flex flex-col gap-3 items-stretch max-w-[440px] flex-wrap [&_>_label]:flex-1 [&_>_label]:min-w-[min(220px,_100%)]"
+              class="stack flex flex-col gap-3 items-stretch max-w-[440px] flex-wrap [&>label]:flex-1 [&>label]:min-w-[min(220px,_100%)]"
               onsubmit={(event) => {
                 event.preventDefault();
                 const digit = (tones[call.ID] || "").trim().toUpperCase();
@@ -338,9 +336,9 @@
                 });
               }}
             >
-              <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]" for={`tone-${call.ID}`}>Menu digit</label>
-              <div class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]">
-                <input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+              <label class={ui.label} for={`tone-${call.ID}`}>Menu digit</label>
+              <div class={ui.row}>
+                <input class={ui.field}
                   id={`tone-${call.ID}`}
                   placeholder="0–9, * or #"
                   maxlength="1"
@@ -354,7 +352,7 @@
                   >Send digit</button
                 >
               </div>
-              <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+              <p class={ui.hint}>
                 Type a digit and press Enter to send it to the call’s phone
                 menu.{call.Held ? " Resume the call first." : ""}
               </p>
@@ -363,16 +361,16 @@
                 </p>{/if}
             </form>
           </details>
-          <details class={[ui.details, "mt-5 border-t border-t-border pt-4"]}>
-            <summary class={[ui.summary, "px-0 py-1"]}>Transfer call</summary>
+          <details class={[ui.details, "mt-5 pt-4 border-t border-border"]}>
+            <summary class={ui.summary}>Transfer call</summary>
             <form
-              class="row flex items-center gap-[0.7rem] max-[700px]:flex-wrap [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]"
+              class={ui.row}
               onsubmit={(e) => {
                 e.preventDefault();
                 run(() => api.Transfer(call.ID, transfer[call.ID] || ""));
               }}
             >
-              <input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+              <input class={ui.field}
                 aria-label="Number or SIP address to transfer to"
                 placeholder="Number or SIP address"
                 bind:value={transfer[call.ID]}
@@ -380,14 +378,11 @@
                 >Transfer now</button
               >
             </form>
-            <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+            <p class={ui.hint}>
               To speak with the recipient first, hold this call and start a
               second call. Then choose that call below.
             </p>
-            <div class="
-              row flex items-center gap-[0.7rem] flex-wrap max-[700px]:flex-wrap [&_>_button]:shrink-0
-              max-[700px]:[&_>_.grow]:basis-[180px]
-            ">
+            <div class={[ui.row, "flex-wrap"]}>
               <Dropdown
                 label="Consultation call"
                 bind:value={consult[call.ID]}
@@ -408,13 +403,13 @@
                 >Complete transfer</button
               >
             </div>
-            <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+            <p class={ui.hint}>
               Keep this call open until the transfer succeeds. Transfers require
               support from the phone service.
             </p>
           </details>{/if}
-        {#if call.State === "connected"}<details class={[ui.details, "mt-5 border-t border-t-border pt-4"]}>
-            <summary class={[ui.summary, "px-0 py-1"]}>Call volume & recording</summary><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+        {#if call.State === "connected"}<details class={[ui.details, "mt-5 pt-4 border-t border-border"]}>
+            <summary class={ui.summary}>Call volume & recording</summary><label class={ui.label}
               >Microphone · {Math.round(
                 (call.Stats.InputGain ?? 1) * 100,
               )}%<input class={ui.range}
@@ -432,7 +427,7 @@
                     ),
                   )}
               /></label
-            ><label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
+            ><label class={ui.label}
               >Speaker · {Math.round((call.Stats.OutputGain ?? 1) * 100)}%<input class={ui.range}
                 type="range"
                 min="0"
@@ -459,82 +454,65 @@
               >{call.Stats.Recording
                 ? "Stop recording"
                 : "Record to WAV…"}</button
-            >{#if call.Stats.Recording}<p class="m-0 leading-[1.6]" role="status">
+            >{#if call.Stats.Recording}<p class={ui.text} role="status">
                 Recording · {call.Stats.RecordingPath}
               </p>{/if}
           </details>{/if}
-        {#if showStats}<dl class="
-          text-xs mt-4 tabular-nums [&_div]:px-0 [&_div]:py-[0.6rem] [&_div]:flex [&_div]:justify-between
-          [&_div]:gap-4 [&_div]:border-b [&_div]:border-b-border [&_dt]:text-muted [&_dd]:m-0
-          [&_dd]:wrap-anywhere [&_dd]:text-right [&_dd]:min-w-0
-        ">
-            {#each statistics(call.Stats || {}) as [key, value]}<div>
-                <dt>{key}</dt>
-                <dd>{value}</dd>
+        {#if showStats}<dl class="mt-4 text-xs tabular-nums">
+            {#each statistics(call.Stats || {}) as [key, value]}<div class={statRow}>
+                <dt class="text-muted">{key}</dt>
+                <dd class={statValue}>{value}</dd>
               </div>{/each}
           </dl>
-          <details class={[ui.details, "mt-[1.3rem] border-t border-t-border pt-4"]}>
-            <summary class={[ui.summary, "px-0 py-1"]}>All technical statistics</summary>
-            <dl class="
-              text-xs mt-4 tabular-nums [&_div]:px-0 [&_div]:py-[0.6rem] [&_div]:flex [&_div]:justify-between
-              [&_div]:gap-4 [&_div]:border-b [&_div]:border-b-border [&_dt]:text-muted [&_dd]:m-0
-              [&_dd]:wrap-anywhere [&_dd]:text-right [&_dd]:min-w-0
-            ">
-              {#each Object.entries(call.Stats || {}) as [key, value]}<div>
-                  <dt>{key}</dt>
-                  <dd>{value === null ? "Unavailable" : String(value)}</dd>
+          <details class={[ui.details, ui.section]}>
+            <summary class={ui.summary}>All technical statistics</summary>
+            <dl class="mt-4 text-xs tabular-nums">
+              {#each Object.entries(call.Stats || {}) as [key, value]}<div class={statRow}>
+                  <dt class="text-muted">{key}</dt>
+                  <dd class={statValue}>{value === null ? "Unavailable" : String(value)}</dd>
                 </div>{/each}
             </dl>
           </details>{/if}
       </article>
-    {:else}<div class={["mt-4 py-8 text-center rounded-[6px]", workspace ? "text-muted [&>h3]:text-[0.9rem] [&>h3]:font-normal [&>p]:hidden" : "px-6 border border-border bg-surface-secondary"]}>
-        <h3 class="m-0 text-base font-semibold">No active calls</h3>
-        <p class="m-0 leading-[1.6] text-muted">
+    {:else}<div class={["mt-4 py-8 text-center rounded-[6px]", workspace ? "text-muted" : "px-6 border border-border bg-surface-secondary"]}>
+        <h3 class={workspace ? "m-0 text-[0.9rem] font-normal" : ui.h3}>No active calls</h3>
+        {#if !workspace}<p class="m-0 leading-[1.6] text-muted">
           Type a number above to call. Incoming calls will appear here.
-        </p>
+        </p>{/if}
       </div>{/each}
   </section>
-  <section class={["min-w-0 rounded-[6px] [&_.stack]:gap-[0.85rem]", workspace ? "pt-2 pb-6" : "p-6 border border-border border-t-[#526271] bg-surface shadow-panel max-[700px]:p-[1.15rem]"]}>
-    <div class="flex items-center gap-4 mb-7 [&_h2]:mx-0 [&_h2]:mt-0 [&_h2]:mb-1 [&_h2]:text-[1.45rem]"><span class="grid place-items-center w-[48px] h-[48px] rounded-[10px] bg-accent-surface text-accent border border-brand-border"><Icon name="phone" size={24} /></span><div><h2 class={ui.h2}>{workspace ? "Make a call" : "New call"}</h2>{#if workspace}<p class="m-0 leading-[1.6] text-muted text-[0.78rem]">Enter a number, SIP address or contact name.</p>{/if}</div></div>
+  <section class={["min-w-0 rounded-[6px]", workspace ? "pt-2 pb-6" : "p-6 border border-border border-t-panel-edge bg-surface shadow-panel max-[700px]:p-[1.15rem]"]}>
+    <div class="flex items-center gap-4 mb-7"><span class="grid place-items-center w-[48px] h-[48px] rounded-[10px] bg-accent-surface text-accent border border-brand-border"><Icon name="phone" size={24} /></span><div><h2 class="mx-0 mt-0 mb-1 text-[1.45rem] font-semibold">{workspace ? "Make a call" : "New call"}</h2>{#if workspace}<p class={ui.hint}>Enter a number, SIP address or contact name.</p>{/if}</div></div>
     <form
-      class="stack flex flex-col gap-4"
+      class="stack flex flex-col gap-[0.85rem]"
       onsubmit={(event) => {
         event.preventDefault();
         if (!busy && account && target.trim())
           run(() => api.Dial(account, target.trim()));
       }}
     >
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]" for="call-destination">Name, phone number or SIP address</label>
-      <div class="
-        row flex items-end gap-3 max-[700px]:flex-wrap [&_>_button]:shrink-0 [&_>_button]:min-h-[52px]
-        [&_>_button]:flex [&_>_button]:items-center [&_>_button]:justify-center [&_>_button]:gap-2
-        [&_>_label]:flex-1 [&_>_input]:flex-1 [&_>_input]:w-0 max-[700px]:[&_>_label]:basis-full
-        max-[700px]:[&_>_input]:basis-full max-[700px]:[&_>_input]:w-full
-        max-[700px]:[&_>_.grow]:basis-[180px]
-      ">
+      <label class={ui.label} for="call-destination">Name, phone number or SIP address</label>
+      <div class="flex items-stretch gap-3 max-[700px]:flex-wrap">
         <input
           id="call-destination"
-          class={[ui.input, "dial-input grow p-[0.8rem] flex-1 text-left text-[1.15rem]"]}
+          class={[ui.input, "dial-input flex-1 p-[0.8rem] text-left text-[1.15rem] max-[700px]:basis-full"]}
           placeholder="Type a number or search contacts"
           autocomplete="off"
           bind:value={target}
         />
-        <button class={[ui.primaryButton, "primary"]} disabled={busy || !account || !target.trim()}
+        <button class={[ui.primaryButton, "flex shrink-0 items-center justify-center gap-2"]} disabled={busy || !account || !target.trim()}
           ><Icon name="phone" size={18} /> Call</button
         >
       </div>
-      <div class="
-        row flex items-center gap-[0.7rem] justify-between flex-wrap max-[700px]:flex-wrap
-        [&_>_button]:shrink-0 max-[700px]:[&_>_.grow]:basis-[180px]
-      ">
-        <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+      <div class={[ui.row, "justify-between flex-wrap"]}>
+        <p class={ui.hint}>
           {account
             ? `Calling from ${account}. Press Enter to call.`
             : "Add and select an account to make a call."}
         </p>
         <button
           type="button"
-          class={[ui.quietButton, "quiet"]}
+          class={ui.quietButton}
           disabled={busy || !account}
           onclick={() =>
             run(async () => {
@@ -548,69 +526,39 @@
             })}>Use last number</button
         >
       </div>
-      {#if redialNotice}<p class="m-0 leading-[1.6] text-muted text-[0.78rem]" role="status">
+      {#if redialNotice}<p class={ui.hint} role="status">
           {redialNotice}
         </p>{/if}
       {#if suggestions.length}
         <div
-          class="max-h-[220px] overflow-y-auto"
+          class="max-h-[320px] overflow-y-auto pr-1"
           aria-label={target ? "Matching contacts" : "Favorite contacts"}
         >
-          <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+          <p class={ui.hint}>
             {target ? "Matching contacts" : "Favorites"}
           </p>
-          {#each suggestions as contact}
-            <div class="
-              px-0 py-4 flex-wrap gap-[0.7rem] items-center border-b border-b-border [&_strong]:block
-              [&_strong]:wrap-anywhere [&_strong]:mb-[0.3rem] [&_span]:block [&_span]:wrap-anywhere
-              [&_button]:text-[0.8rem]
-            ">
-              <button
-                type="button"
-                class="
-                  grow px-0 py-[0.35rem] outline-offset-3 cursor-pointer rounded-[6px] bg-transparent text-inherit
-                  min-h-[38px] shadow-none font-medium leading-[1.4] transition-colors duration-150 flex-1 min-w-0
-                  text-left border-0 border-[#536271] disabled:opacity-[0.45] disabled:cursor-not-allowed
-                  [&:hover:not(:disabled)]:bg-[#435362] [&:hover:not(:disabled)]:border-[#727e8d]
-                  [&:active:not(:disabled)]:[box-shadow:inset_0_1px_3px_#0004]
-                "
-                onclick={() => {
-                  target = contact.Address;
-                  if (contact.Account) account = contact.Account;
-                }}
-                ><strong>{contact.Name}</strong><span class="text-muted"
-                  >{contact.Address}</span
-                ></button
-              >
-              {#each contact.Numbers || [] as number}
-                {#if target && number.Address !== contact.Address && number.Address.toLowerCase().includes(target.toLowerCase())}
-                  <button class={ui.button}
-                    type="button"
-                    onclick={() => {
-                      target = number.Address;
-                      if (contact.Account) account = contact.Account;
-                    }}
-                    >{number.Label || "Other number"} · {number.Address}</button
-                  >
-                {/if}
-              {/each}
-            </div>
+          {#each suggestions as contact (contact.ID)}
+            <ContactCard
+              {contact}
+              presence={presenceByTarget.get(extensionOf(contact))}
+              onDial={(address) => {
+                target = address;
+                if (contact.Account) account = contact.Account;
+              }}
+            />
           {/each}
         </div>
       {/if}
-      {#if contactError}<p class="m-0 leading-[1.6] text-[#f9a8b9]" role="status">
+      {#if contactError}<p class={ui.error} role="status">
           Contact search: {contactError}
         </p>{/if}
     </form>
   </section>
-  <section class={["order-2", workspace ? "border-t border-border [&>details]:border-t-0" : "grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-5"]} aria-label="Account services">
+  <section class={["order-2", workspace ? "border-t border-border" : "grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-5"]} aria-label="Account services">
     {#if snapshot.Accounts.find((a) => a.Name === account)?.Features?.length}
-      <details class={[ui.details, "mt-[1.3rem] border-t border-t-border pt-4"]}>
-        <summary class={[ui.summary, "px-0 py-1"]}>Phone service shortcuts</summary>
-        <div class="
-          row flex items-center gap-[0.7rem] flex-wrap max-[700px]:flex-wrap [&_>_button]:shrink-0
-          max-[700px]:[&_>_.grow]:basis-[180px]
-        ">
+      <details class={[ui.details, workspace ? "mt-[1.3rem] pt-4" : ui.section]}>
+        <summary class={ui.summary}>Phone service shortcuts</summary>
+        <div class={[ui.row, "flex-wrap"]}>
           {#each snapshot.Accounts.find((a) => a.Name === account).Features as feature}
             <button class={ui.button}
               disabled={busy ||
@@ -640,12 +588,9 @@
         </div>
       </details>
     {/if}
-    <details class={[ui.details, "mt-[1.3rem] border-t border-t-border pt-4"]}>
-      <summary class={[ui.summary, "px-0 py-1"]}>Your status & voicemail</summary>
-      <div class="
-        row flex items-center gap-[0.7rem] flex-wrap max-[700px]:flex-wrap [&_>_button]:shrink-0
-        max-[700px]:[&_>_.grow]:basis-[180px]
-      ">
+    <details class={[ui.details, workspace ? "mt-[1.3rem] pt-4" : ui.section]}>
+      <summary class={ui.summary}>Your status & voicemail</summary>
+      <div class={[ui.row, "flex-wrap"]}>
         <button class={ui.button}
           disabled={busy || !account}
           onclick={() => run(() => api.WatchVoicemail(account))}
@@ -656,21 +601,18 @@
           >Call voicemail</button
         >
       </div>
-      {#each (snapshot.Presence || []).filter((p) => p.Account === account && p.Voicemail) as p}<p class="m-0 leading-[1.6]"
+      {#each (snapshot.Presence || []).filter((p) => p.Account === account && p.Voicemail) as p}<p class={ui.text}
         >
           {p.Voicemail.Waiting ? "New voicemail" : "No new voicemail"} · {p
             .Voicemail.New} new / {p.Voicemail.Old} old · {p.State}
         </p>{/each}
-      <label class="flex flex-col gap-2 text-[0.9rem] text-[#c8cdd5]"
-        >Your status message<input class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+      <label class={ui.label}
+        >Your status message<input class={ui.field}
           maxlength="512"
           bind:value={statusNote}
         /></label
       >
-      <div class="
-        row flex items-center gap-[0.7rem] flex-wrap max-[700px]:flex-wrap [&_>_button]:shrink-0
-        max-[700px]:[&_>_.grow]:basis-[180px]
-      ">
+      <div class={[ui.row, "flex-wrap"]}>
         <button class={ui.button}
           disabled={busy || !account}
           onclick={() =>
@@ -693,11 +635,11 @@
             ? ` · ${a.PresenceNote}`
             : ""}
         </p>
-        {#if a.PresenceError}<p class="m-0 leading-[1.6] text-[0.78rem] text-[#f9a8b9]">
+        {#if a.PresenceError}<p class="m-0 leading-[1.6] text-[0.78rem] text-danger">
             {a.PresenceError}
           </p>{/if}
       {/each}
-      <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+      <p class={ui.hint}>
         Status refreshes while this account is enabled. Standard SIP publication
         requires server support. This does not set Swyx custom statuses.
       </p>

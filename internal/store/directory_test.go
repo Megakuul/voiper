@@ -16,7 +16,7 @@ func TestDirectoryRequiresSecureExplicitEndpoint(t *testing.T) {
 }
 
 func TestDirectoryImportPreservesLocalEdits(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestDirectoryKeepsNumbersWithinTheirEntry(t *testing.T) {
 	if second.Address != "200" || len(second.Numbers) != 0 {
 		t.Fatalf("second entry: %+v", second)
 	}
-	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}

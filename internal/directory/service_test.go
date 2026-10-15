@@ -10,7 +10,7 @@ import (
 )
 
 func TestConfigurationAndCloseCancelPendingCredentials(t *testing.T) {
-	database, err := store.Open(filepath.Join(t.TempDir(), "contacts.db"))
+	database, err := store.Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestConfigurationAndCloseCancelPendingCredentials(t *testing.T) {
 }
 
 func TestPreviewCredentialsStayWithConfiguredServer(t *testing.T) {
-	database, err := store.Open(filepath.Join(t.TempDir(), "contacts.db"))
+	database, err := store.Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}

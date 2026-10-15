@@ -98,18 +98,18 @@
   disabled={busy || disabled}
 >
   <legend class="font-semibold mb-4">CSV column mapping</legend>
-  <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+  <p class={ui.hint}>
     Use a comma-separated CSV with a header row. Choose which columns contain
     names, numbers and notes. Mapping keeps one contact per source row.
   </p>
-  {#if busy}<p class="m-0 leading-[1.6]" role="status">Processing CSV…</p>{/if}
-  {#if error}<p class="m-0 leading-[1.6]" role="alert">{error}</p>{/if}
-  {#if notice}<p class="m-0 leading-[1.6]" role="status">{notice}</p>{/if}
+  {#if busy}<p class={ui.text} role="status">Processing CSV…</p>{/if}
+  {#if error}<p class={ui.text} role="alert">{error}</p>{/if}
+  {#if notice}<p class={ui.text} role="status">{notice}</p>{/if}
   {#if columns.length}
     <div
       class="fields mb-3 grid grid-cols-[repeat(auto-fit,minmax(min(12rem,100%),1fr))] items-end gap-3"
     >
-      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
+      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-label">
         Name or first name
         <Dropdown
           label="Name or first name"
@@ -122,7 +122,7 @@
           ]}
         />
       </label>
-      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
+      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-label">
         Last name to append
         <Dropdown
           label="Last name to append"
@@ -135,7 +135,7 @@
           ]}
         />
       </label>
-      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
+      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-label">
         Preferred primary number
         <Dropdown
           label="Preferred primary number"
@@ -148,7 +148,7 @@
           ]}
         />
       </label>
-      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
+      <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-label">
         Notes
         <Dropdown
           label="Notes"
@@ -166,7 +166,7 @@
       <div
         class="number mb-3 grid grid-cols-[repeat(auto-fit,minmax(min(12rem,100%),1fr))] items-end gap-3"
       >
-        <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
+        <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-label">
           Additional number {index + 1}
           <Dropdown
             label={`Additional number ${index + 1}`}
@@ -179,10 +179,10 @@
             ]}
           />
         </label>
-        <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-[#c8cdd5]">
+        <label class="flex min-w-0 flex-col gap-[0.3rem] text-[0.9rem] text-label">
           Label
           <input
-            class={[ui.input, "px-[0.8rem] py-[0.65rem]"]}
+            class={ui.field}
             bind:value={number.Label}
             oninput={invalidate}
             maxlength="80"
@@ -194,7 +194,7 @@
         </button>
       </div>
     {/each}
-    <p class="m-0 leading-[1.6] text-muted text-[0.78rem]">
+    <p class={ui.hint}>
       The first nonempty number becomes primary. Empty and repeated numbers are
       skipped; rows with no number appear as errors in the preview. Labels apply
       to additional numbers. Missing names use the primary number.

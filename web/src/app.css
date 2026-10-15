@@ -14,6 +14,17 @@
   --color-surface: var(--surface);
   --color-surface-inset: var(--surface-inset);
   --color-surface-secondary: var(--surface-secondary);
+  --color-foreground: var(--foreground);
+  --color-subtle: var(--subtle);
+  --color-label: var(--label);
+  --color-danger: var(--danger);
+  --color-panel-edge: var(--panel-edge);
+  --color-field: var(--field);
+  --color-field-border: var(--field-border);
+  --color-control: var(--control);
+  --color-control-hover: var(--control-hover);
+  --color-control-border: var(--control-border);
+  --color-control-border-hover: var(--control-border-hover);
   --shadow-panel: var(--shadow-panel-value);
   --shadow-control: var(--shadow-control-value);
 }
@@ -22,7 +33,7 @@
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  color: #eef0f3;
+  color: var(--foreground);
   background: var(--canvas);
   font-synthesis: none;
   color-scheme: dark;
@@ -39,6 +50,17 @@
   --surface: #29323b;
   --surface-inset: #202830;
   --surface-secondary: #242d36;
+  --foreground: #eef0f3;
+  --subtle: #8e9aa6;
+  --label: #c8cdd5;
+  --danger: #f9a8b9;
+  --panel-edge: #526271;
+  --field: #1c252e;
+  --field-border: #4b5a68;
+  --control: #35424e;
+  --control-hover: #435362;
+  --control-border: #536271;
+  --control-border-hover: #727e8d;
   --shadow-panel-value: 0 2px 5px #0004;
   --shadow-control-value: 0 1px 2px #0005, inset 0 1px 0 #ffffff08;
 }

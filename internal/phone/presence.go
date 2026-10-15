@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	wire "github.com/emiago/sipgo/sip"
@@ -26,7 +28,13 @@ type Presence struct {
 	hasDialogState                                       bool
 	watchContext                                         context.Context
 	cancelWatch                                          context.CancelFunc
+	// automatic watches follow the contacts being browsed; lastWanted orders their eviction.
+	automatic  bool
+	lastWanted time.Time
 }
+
+// automaticWatchLimit leaves room for explicit and voicemail watches below the overall limit.
+const automaticWatchLimit = 100
 
 type Voicemail struct {
 	Account, State                 string
@@ -76,7 +84,103 @@ func (m *Manager) Watch(accountName, target string) error {
 	if a.config.PresenceMode == "dialog" {
 		eventPackage, accept = "dialog", "application/dialog-info+xml"
 	}
-	return m.watch(accountName, a, target, eventPackage, accept)
+	return m.watch(accountName, a, target, eventPackage, accept, false)
+}
+
+// WatchVisible subscribes to the status of contacts currently shown to the user.
+// Earlier automatic watches remain until newer ones exceed automaticWatchLimit,
+// so returning to a previous search shows status immediately. Subscriptions
+// run in the background; failures are recorded on the entry instead of reported.
+func (m *Manager) WatchVisible(accountName string, targets []string) error {
+	a, err := m.getAccount(accountName)
+	if err != nil {
+		return err
+	}
+	if a.config.PresenceMode == "disabled" {
+		return nil
+	}
+	eventPackage, accept := "presence", "application/pidf+xml"
+	if a.config.PresenceMode == "dialog" {
+		eventPackage, accept = "dialog", "application/dialog-info+xml"
+	}
+	now := time.Now()
+	wanted := map[string]bool{}
+	var pending []string
+	var evicted []Presence
+	m.mu.Lock()
+	if m.accounts[accountName] != a {
+		m.mu.Unlock()
+		return errors.New("account changed")
+	}
+	for _, target := range targets {
+		target = strings.TrimSpace(target)
+		key := watchKey(accountName, normalizeWatchTarget(target, a.config), eventPackage)
+		if target == "" || wanted[key] || len(wanted) >= automaticWatchLimit {
+			continue
+		}
+		wanted[key] = true
+		if p, exists := m.presence[key]; exists {
+			if p.automatic {
+				p.lastWanted = now
+				m.presence[key] = p
+			}
+			continue
+		}
+		pending = append(pending, target)
+	}
+	var candidates []string
+	automatic := 0
+	for key, p := range m.presence {
+		if p.Account != accountName || !p.automatic {
+			continue
+		}
+		automatic++
+		if !wanted[key] {
+			candidates = append(candidates, key)
+		}
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return m.presence[candidates[i]].lastWanted.Before(m.presence[candidates[j]].lastWanted)
+	})
+	for _, key := range candidates {
+		if automatic+len(pending) <= automaticWatchLimit {
+			break
+		}
+		evicted = append(evicted, m.presence[key])
+		delete(m.presence, key)
+		automatic--
+	}
+	m.mu.Unlock()
+	if len(evicted) == 0 && len(pending) == 0 {
+		return nil
+	}
+	m.notify()
+	go func() {
+		for _, p := range evicted {
+			_ = m.endWatch(a, p)
+		}
+		// A few parallel subscriptions keep a page of contacts quick without flooding the server.
+		queue := make(chan string)
+		var workers sync.WaitGroup
+		for range 4 {
+			workers.Add(1)
+			go func() {
+				defer workers.Done()
+				for target := range queue {
+					_ = m.watch(accountName, a, target, eventPackage, accept, true)
+				}
+			}()
+		}
+		for _, target := range pending {
+			if a.ctx.Err() != nil {
+				break
+			}
+			queue <- target
+		}
+		close(queue)
+		workers.Wait()
+	}()
+	return nil
 }
 
 func (m *Manager) WatchVoicemail(accountName string) error {
@@ -84,10 +188,10 @@ func (m *Manager) WatchVoicemail(accountName string) error {
 	if err != nil {
 		return err
 	}
-	return m.watch(accountName, a, a.config.Username, "message-summary", "application/simple-message-summary")
+	return m.watch(accountName, a, a.config.Username, "message-summary", "application/simple-message-summary", false)
 }
 
-func (m *Manager) watch(accountName string, a *account, target, eventPackage, accept string) error {
+func (m *Manager) watch(accountName string, a *account, target, eventPackage, accept string, automatic bool) error {
 	originalTarget := strings.TrimSpace(target)
 	target = normalizeWatchTarget(target, a.config)
 	key := watchKey(accountName, target, eventPackage)
@@ -98,6 +202,10 @@ func (m *Manager) watch(accountName string, a *account, target, eventPackage, ac
 	}
 	existing, exists := m.presence[key]
 	if exists && (existing.State != "unknown" || existing.SubscriptionID != "") {
+		if !automatic && existing.automatic {
+			existing.automatic = false
+			m.presence[key] = existing
+		}
 		m.mu.Unlock()
 		return nil
 	}
@@ -109,7 +217,7 @@ func (m *Manager) watch(accountName string, a *account, target, eventPackage, ac
 		existing.cancelWatch()
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
-	entry := Presence{Account: accountName, Remote: target, Target: originalTarget, State: "subscribing", Source: eventPackage, Updated: time.Now(), watchContext: ctx, cancelWatch: cancel}
+	entry := Presence{Account: accountName, Remote: target, Target: originalTarget, State: "subscribing", Source: eventPackage, Updated: time.Now(), watchContext: ctx, cancelWatch: cancel, automatic: automatic, lastWanted: time.Now()}
 	if eventPackage == "message-summary" {
 		entry.Voicemail = &Voicemail{Account: accountName, State: "subscribing"}
 	}
@@ -119,7 +227,13 @@ func (m *Manager) watch(accountName string, a *account, target, eventPackage, ac
 	m.mu.Lock()
 	current, exists := m.presence[key]
 	if m.accounts[accountName] == a && exists && current.watchContext == ctx {
-		if err != nil {
+		if err != nil && automatic {
+			// Keep the failure visible and avoid resubscribing on every page load.
+			current.State = "unavailable"
+			current.Note = err.Error()
+			current.Updated = time.Now()
+			m.presence[key] = current
+		} else if err != nil {
 			delete(m.presence, key)
 		} else {
 			entry := m.presence[key]
@@ -132,6 +246,9 @@ func (m *Manager) watch(accountName string, a *account, target, eventPackage, ac
 	m.mu.Unlock()
 	if err != nil {
 		cancel()
+		if automatic {
+			m.notify()
+		}
 		return err
 	}
 	m.notify()
@@ -146,18 +263,20 @@ func (m *Manager) Unwatch(accountName, target string) error {
 		return nil
 	}
 	key := watchKey(accountName, normalizeWatchTarget(target, a.config), "presence")
-	p, exists := m.presence[key]
+	p := m.presence[key]
 	delete(m.presence, key)
 	m.mu.Unlock()
 	m.notify()
-	if !exists || p.SubscriptionID == "" {
-		if p.cancelWatch != nil {
-			p.cancelWatch()
-		}
-		return nil
-	}
+	return m.endWatch(a, p)
+}
+
+// endWatch stops a subscription already removed from the presence map.
+func (m *Manager) endWatch(a *account, p Presence) error {
 	if p.cancelWatch != nil {
 		defer p.cancelWatch()
+	}
+	if p.SubscriptionID == "" {
+		return nil
 	}
 	ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
 	defer cancel()
@@ -232,6 +351,7 @@ func (m *Manager) handlePresenceLocked(ev event) {
 	p.Account = ev.account
 	p.Target = old.Target
 	p.watchContext, p.cancelWatch = old.watchContext, old.cancelWatch
+	p.automatic, p.lastWanted = old.automatic, old.lastWanted
 	p.SubscriptionID = e.CallID
 	p.Remote = old.Remote
 	m.presence[key] = p

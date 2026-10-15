@@ -171,7 +171,7 @@ func TestCloseWaitsForTransferredCallHistory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	path := filepath.Join(t.TempDir(), "transfer.sqlite")
-	database, err := store.Open(path)
+	database, err := store.Open(path, filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}

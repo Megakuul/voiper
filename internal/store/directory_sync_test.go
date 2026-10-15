@@ -7,7 +7,7 @@ import (
 )
 
 func TestDirectorySyncPreservesLocalChangesAndHandlesPartialScans(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,8 @@ func TestDirectorySyncPreservesLocalChangesAndHandlesPartialScans(t *testing.T) 
 
 func TestDirectoryConfigurationSwitchRejectsStaleResults(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "contacts.db")
-	s, err := Open(path)
+	contactsPath := filepath.Join(t.TempDir(), "contacts.toml")
+	s, err := Open(path, contactsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +109,7 @@ func TestDirectoryConfigurationSwitchRejectsStaleResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.Close()
-	s, err = Open(path)
+	s, err = Open(path, contactsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +133,7 @@ func TestDirectoryConfigurationSwitchRejectsStaleResults(t *testing.T) {
 }
 
 func TestDirectoryInvalidResultIsAtomic(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +153,7 @@ func TestDirectoryInvalidResultIsAtomic(t *testing.T) {
 }
 
 func TestRestoreDirectoryVersionAndKeepDeletionHidden(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "contacts.db"), filepath.Join(t.TempDir(), "contacts.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
