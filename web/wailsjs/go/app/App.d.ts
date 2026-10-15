@@ -25,6 +25,8 @@ export function Conference(arg1:Array<string>):Promise<void>;
 
 export function ConfigureGlobalShortcuts():Promise<void>;
 
+export function Consult(arg1:string,arg2:string):Promise<void>;
+
 export function Contacts(arg1:string):Promise<Array<store.Contact>>;
 
 export function ContactsPage(arg1:string,arg2:number,arg3:number):Promise<Array<store.Contact>>;
@@ -160,6 +162,8 @@ export function TakeDialTarget():Promise<string>;
 export function TestAudio(arg1:media.Settings,arg2:string):Promise<audio.TestResult>;
 
 export function Transfer(arg1:string,arg2:string):Promise<void>;
+
+export function TrustNewSwyxCertificate(arg1:string):Promise<void>;
 
 export function UnpublishStatus(arg1:string):Promise<void>;
 

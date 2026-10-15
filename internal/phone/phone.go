@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/megakuul/voiper/internal/compat/swyx"
+	"github.com/megakuul/voiper/internal/compat/swyx/cds"
 	"github.com/megakuul/voiper/internal/config"
 	"github.com/megakuul/voiper/internal/store"
 	"github.com/megakuul/voiper/pkg/media"
@@ -25,20 +26,25 @@ type AccountState struct {
 	Forwarding                                 bool
 	Name, State, Error                         string
 	Capabilities                               swyx.Capabilities
+	// SwyxAPI is "", connecting, connected or failed; see swyx.go.
+	SwyxAPI, SwyxAPIError string
 }
 type CallState struct {
 	ID, Account, Remote, Direction, State, Error string
 	TransferStatus                               string
-	Muted, Held                                  bool
-	Started                                      time.Time
-	Connected                                    time.Time
-	Stats                                        media.Stats
+	// ConsultationFor is the held call this call may be transferred to.
+	ConsultationFor string
+	Muted, Held     bool
+	Started         time.Time
+	Connected       time.Time
+	Stats           media.Stats
 }
 type Snapshot struct {
 	UnreadMessages int
 	Accounts       []AccountState
 	Calls          []CallState
 	DND            bool
+	ScreenLocked   bool
 	Audio          media.Settings
 	Presence       []Presence
 }
@@ -54,6 +60,12 @@ type account struct {
 	config            config.Config
 	cancel            context.CancelFunc
 	state             AccountState
+	// Guarded by Manager.mu. allow is nil until the registrar answered OPTIONS.
+	allow        []string
+	probed       bool
+	status       ownStatus
+	swyx         *swyxSession
+	swyxPresence map[string]cds.Presence
 }
 type call struct {
 	connected, ended chan struct{}
@@ -89,6 +101,7 @@ type Manager struct {
 	calls           map[string]*call
 	settings        media.Settings
 	dnd             bool
+	screenLocked    bool
 	store           *store.Store
 	emit            func(string, any)
 	events          chan event
@@ -123,7 +136,7 @@ func (m *Manager) report(err error) {
 }
 func (m *Manager) Snapshot() Snapshot {
 	m.mu.Lock()
-	s := Snapshot{Accounts: []AccountState{}, Calls: []CallState{}, DND: m.dnd, Audio: m.settings}
+	s := Snapshot{Accounts: []AccountState{}, Calls: []CallState{}, DND: m.dnd, ScreenLocked: m.screenLocked, Audio: m.settings}
 	streams := map[string]*media.Call{}
 	for _, a := range m.accounts {
 		s.Accounts = append(s.Accounts, a.state)
@@ -133,6 +146,9 @@ func (m *Manager) Snapshot() Snapshot {
 		streams[c.state.ID] = c.media
 	}
 	for _, p := range m.presence {
+		if a := m.accounts[p.Account]; a != nil && a.swyxPresence != nil && p.Voicemail == nil {
+			p = withSwyxPresence(p, a.swyxPresence)
+		}
 		s.Presence = append(s.Presence, p)
 	}
 	m.mu.Unlock()
@@ -154,7 +170,7 @@ func (m *Manager) Enable(name string, cfg config.Config) error {
 		return err
 	}
 	ctx, cancel := context.WithCancel(m.ctx)
-	a := &account{publications: make(chan publicationRequest), publicationDone: make(chan struct{}), publicationWake: make(chan struct{}, 1), registrationDone: make(chan struct{}), ctx: ctx, config: cfg, cancel: cancel, state: AccountState{Name: name, State: "registering", Features: cfg.Features, Forwarding: cfg.ForwardAlways != "" || cfg.ForwardBusy != "" || cfg.ForwardNoAnswer != "", Capabilities: swyx.Detect("", cfg.PresenceMode, cfg.MessagingMode)}}
+	a := &account{publications: make(chan publicationRequest), publicationDone: make(chan struct{}), publicationWake: make(chan struct{}, 1), registrationDone: make(chan struct{}), ctx: ctx, config: cfg, cancel: cancel, state: AccountState{Name: name, State: "registering", Features: cfg.Features, Forwarding: cfg.ForwardAlways != "" || cfg.ForwardBusy != "" || cfg.ForwardNoAnswer != "", Capabilities: swyx.Detect("", nil, cfg.PresenceMode, cfg.MessagingMode)}}
 	client, err := sip.NewClient(sip.Config{Server: cfg.Server, Port: cfg.Port, Domain: cfg.Domain, Username: cfg.Username, AuthUsername: cfg.AuthUsername, Password: cfg.Password, DisplayName: cfg.DisplayName, Transport: cfg.Transport, LocalAddress: cfg.LocalAddress, OutboundProxy: cfg.OutboundProxy, Expires: time.Hour, MaxRedirects: cfg.MaxRedirects, TLSConfig: tlsConfig}, func(e sip.Event) {
 		select {
 		case m.events <- event{name, a, e}:
@@ -347,7 +363,27 @@ func (m *Manager) SetAudio(s media.Settings) error {
 	m.settings = s
 	return nil
 }
-func (m *Manager) SetDND(v bool) { m.mu.Lock(); m.dnd = v; m.mu.Unlock(); m.notify() }
+
+// SetDND rejects incoming calls locally and sets do not disturb on Swyx.
+func (m *Manager) SetDND(v bool) {
+	m.mu.Lock()
+	m.dnd = v
+	m.mu.Unlock()
+	m.wakeStatus()
+	m.notify()
+}
+
+// SetScreenLocked marks the user away while the desktop is locked.
+func (m *Manager) SetScreenLocked(v bool) {
+	m.mu.Lock()
+	changed := m.screenLocked != v
+	m.screenLocked = v
+	m.mu.Unlock()
+	if changed {
+		m.wakeStatus()
+		m.notify()
+	}
+}
 func (m *Manager) getAccount(name string) (*account, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -368,10 +404,28 @@ func (m *Manager) getCall(id string) (*call, error) {
 }
 
 func (m *Manager) Dial(accountName, target string) error {
-	_, err := m.dial(accountName, target)
+	_, err := m.dial(accountName, target, "")
 	return err
 }
-func (m *Manager) dial(accountName, target string) (string, error) {
+
+// Consult calls a transfer target while the call id waits on hold, so the user
+// can talk to the target before completing an attended transfer.
+func (m *Manager) Consult(id, target string) error {
+	original, err := m.getCall(id)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	state := original.state
+	m.mu.Unlock()
+	if state.State != "connected" {
+		return errors.New("only a connected call can be transferred")
+	}
+	_, err = m.dial(state.Account, target, id)
+	return err
+}
+
+func (m *Manager) dial(accountName, target, consultationFor string) (string, error) {
 	target = normalizeDialTarget(target)
 	if !m.activation.TryLock() {
 		return "", errors.New("finish or cancel the pending call first")
@@ -406,7 +460,7 @@ func (m *Manager) dial(accountName, target string) (string, error) {
 	}
 	settings.SecureSignaling = strings.EqualFold(a.config.Transport, "tls")
 	m.mu.Unlock()
-	c := &call{connected: make(chan struct{}), ended: make(chan struct{}), state: CallState{ID: id, Account: accountName, Remote: target, Direction: "outgoing", State: "preparing", Started: time.Now()}, cancel: cancel, owner: a}
+	c := &call{connected: make(chan struct{}), ended: make(chan struct{}), state: CallState{ID: id, Account: accountName, Remote: target, Direction: "outgoing", State: "preparing", Started: time.Now(), ConsultationFor: consultationFor}, cancel: cancel, owner: a}
 	m.mu.Lock()
 	if m.accounts[accountName] != a {
 		m.mu.Unlock()
@@ -678,8 +732,11 @@ func (m *Manager) Message(accountName, target, body string) error {
 	m.mu.Lock()
 	mode := a.state.Capabilities.Messaging
 	m.mu.Unlock()
-	if mode != "sip" {
-		return errors.New("messaging provider is unavailable; select Standard SIP only if your server supports it")
+	switch mode {
+	case "disabled":
+		return errors.New("messaging is disabled for this account")
+	case "unavailable":
+		return errors.New("this server does not accept chat messages over SIP")
 	}
 	if err := a.client.ValidateTarget(target); err != nil {
 		return err
@@ -724,7 +781,11 @@ func (m *Manager) handle(ev event) {
 		ev.owner.state.State = e.State
 		ev.owner.state.Error = e.Message
 		if e.Server != "" {
-			ev.owner.state.Capabilities = swyx.Detect(e.Server, ev.owner.config.PresenceMode, ev.owner.config.MessagingMode)
+			ev.owner.state.Capabilities = swyx.Detect(e.Server, ev.owner.allow, ev.owner.config.PresenceMode, ev.owner.config.MessagingMode)
+		}
+		if e.State == "registered" && !ev.owner.probed {
+			ev.owner.probed = true
+			go m.probeServer(ev.owner)
 		}
 	case "incoming":
 		forward := ev.owner.config.ForwardAlways
@@ -1003,7 +1064,23 @@ func (m *Manager) AttendedTransfer(id, consultationID string) error {
 		return first.owner.client.TransferToCall(ctx, id, consultationID)
 	})
 }
+
+// Conference mixes two or three connected calls locally. Held calls are
+// resumed first, since dialing the next participant put them on hold.
 func (m *Manager) Conference(ids []string) error {
+	var held []string
+	m.mu.Lock()
+	for _, id := range ids {
+		if c := m.calls[id]; c != nil && c.state.State == "connected" && c.state.Held {
+			held = append(held, id)
+		}
+	}
+	m.mu.Unlock()
+	for _, id := range held {
+		if err := m.Hold(id, false); err != nil {
+			return fmt.Errorf("resume call before merging: %w", err)
+		}
+	}
 	streams := []*media.Call{}
 	seen := map[string]bool{}
 	m.mu.Lock()
@@ -1011,7 +1088,7 @@ func (m *Manager) Conference(ids []string) error {
 		c := m.calls[id]
 		if c == nil || c.media == nil || c.state.State != "connected" || c.state.Held || seen[id] {
 			m.mu.Unlock()
-			return errors.New("choose distinct connected calls and resume held calls before merging")
+			return errors.New("choose distinct connected calls to merge")
 		}
 		seen[id] = true
 		streams = append(streams, c.media)

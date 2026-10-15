@@ -28,7 +28,7 @@ The public [CDS SDK guide](https://cdssdk.swyx.engineering/guide/index.html) dis
 
 For directories, Enreach documents [AD LDS with one-way TLS](https://service.swyx.net/hc/en-gb/articles/13860542950940-Swyx-Phonebook-Does-Not-Longer-Work-with-Older-Yealink-Phones-T4x-CP9x0) for the global phonebook and a separately configured [LDAP password in provisioning settings](https://help.enreach.com/controlcenter/14.25/web/Swyx/en-US/help/chap_serverconfiguration.06.11.html). SIP authentication does not provide that password. Voiper's explicit LDAP/LDAPS configuration uses verified TLS and can discover advertised naming contexts through the standard [LDAP RootDSE](https://www.rfc-editor.org/rfc/rfc4512#section-5.1). It does not guess server endpoints, scan extensions, or copy provisioning credentials. Classic's optional VisualContacts integration also supports separately administered LDAP directories, including [XPhone Connect Directory](https://help.c4b.com/xphone-connect-10/doc/en/admin/intgrtn/clnt/swyx.html). LDAP entries retain multiple labeled numbers; identical display names do not combine different people.
 
-Receiving the tested Classic PIDF extension is supported. Proprietary publication and both unverified vendor messaging generations remain explicitly unavailable until their actual service contracts can be tested. This distinction is deliberate protocol correctness, not a simulated implementation.
+Receiving the tested Classic PIDF extension is supported. Proprietary publication and both unverified vendor messaging generations remain explicitly unavailable until their actual service contracts can be tested. This distinction is deliberate protocol correctness, not a simulated implementation. *(Superseded for status publication by the [live server probe](#live-server-probe-2026-10-15), which found the client API schema on the target server.)*
 
 ## Downloadable SDK and client-contract audit (2026-10-07)
 
@@ -84,3 +84,40 @@ Classic messaging trace/specification covering recipient resolution, MIME/body,
 message identifiers and acknowledgements. A Windows CDS/COM bridge is an
 available architectural alternative, but it would add a Windows runtime/server
 component to the requested standalone Linux client. No such dependency is added.
+
+## Live server probe (2026-10-15)
+
+A SwyxWare installation was available for unauthenticated probing; no call was
+placed and the only SIP request addressed to a person went to extension 100.
+
+- `OPTIONS sip:<server>` and `sip:100@<server>` return `200 OK` with
+  `User-Agent: Swyx IpPbxSrv/14.21 (Swyx.Core_14.21_20250617.1)` and
+  `Allow: REGISTER, INVITE, ACK, CANCEL, BYE, NOTIFY, REFER, OPTIONS, INFO, SUBSCRIBE, UPDATE`.
+  Responses carry the product in `User-Agent`, not `Server`.
+- `MESSAGE sip:100@<server>` and `PUBLISH` of a PIDF document both return
+  `405 Method Not Allowed`, before any authentication challenge. SIP chat and
+  standard status publication are therefore not available on this server.
+- TCP 9100 serves the "CDS Client REST API" (`/ippbx/client/v1.0`) with its
+  Swagger 2.0 document at `/ippbx/swagger/swagger.json`. `login/apiversion`
+  reports 1.0.6, `login/buildversion` 14.21. The server certificate is
+  self-signed.
+
+The operations Voiper uses, with the schema's own enum documentation:
+
+| Operation | Contract |
+| --- | --- |
+| `POST login/acquiretoken` | Body `{UserName, Password}`; returns `{AccessToken, RefreshToken, UserId}`. Wrong credentials return 401 with `{ErrorDetails, SecurityErrorCode: "AuthenticationFailed"}`. |
+| `POST login/refreshtoken?token=` | Returns a new `AuthenticationResult`. |
+| `GET`/`PUT user/{userId}/presenceconfiguration` | `{IsAway, DoNotDisturb, AwayText, Expiration, AppointmentText, AppointmentExpiration, LoginDeviceType, ...}`; the PUT replaces the whole object, so Voiper reads, changes its fields and writes back. Dates use WCF `/Date(ms+zone)/` strings and pass through unchanged. |
+| `GET employees/?paginationIndex=&paginationCount=` | `[{SiteId, EmployeeId, Name, Number, AllEmployeeNumbers: [{Number, NumberType}], Presence}]`; `NumberType` 0 public, 1 internal, 2 e-mail. |
+| `GET employees/presence?clientTimestamp=` | `{Timstamp, List: [{SiteId, EmployeeId, Presence: {Status, StatusText, ...}}]}` (sic); the timestamp is passed back for changes only. `Status`: 0 logged off, 1 logged on, 2 active, 3 no status, 4 away, 5 do not disturb. |
+| `GET user/{userId}` | Includes `MessagingSystem`: 0 Classic IM, 1 Coligo IM. |
+
+Requests send `Authorization: bearer <AccessToken>`. The API contains no chat
+send/receive operation; `chatconfiguration` holds only a `ChatUserId` for the
+separate messenger. Swyx chat therefore remains unimplemented: neither Classic
+IM nor the Coligo service has a published or observed wire contract.
+
+Not yet observed live: an authenticated session (the probe had no credentials),
+whether SIP and client-API passwords match on this installation, and how
+SwyxIt! displays `AwayText` while not away.

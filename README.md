@@ -74,9 +74,9 @@ Run `pnpm --dir web build` inside `nix develop` after frontend changes.
    checks the selected output. Save the sound settings when ready. Automatic
    selection tries PulseAudio first; PipeWire works through its PulseAudio service.
 4. Type an extension or SIP address and press **Enter** or **Call**, or search
-   for a contact and select its number. The active-call card contains mute, hold,
-   transfers, recording, gain controls and optional statistics. For an automated
-   phone menu, expand **Phone menu (DTMF)**, type a digit and press Enter.
+   for a contact and select its number. The active-call card has round controls
+   for mute, hold, **Keypad** (phone menus), **Transfer**, **Add person** and
+   **More** (gain, recording, network audio), plus optional statistics.
 
 PulseAudio/PipeWire shares output with other applications. An explicit ALSA
 hardware device may be exclusive. Audio settings include optional SpeexDSP echo
@@ -86,8 +86,15 @@ Device selection is changed between calls. Real headset/hotplug quality still
 needs acceptance testing.
 
 A new outgoing call or answering another call first holds existing connected
-calls. Resume the desired legs before **Merge active calls**. Local conferences
-support two or three remote legs, with SpeexDSP resampling between codec rates.
+calls. **Add person** searches contacts and calls the new participant while the
+current call waits; once two or three calls are connected, **Merge into
+conference** resumes held legs and mixes them locally, with SpeexDSP resampling
+between codec rates. **Split conference** returns them to separate calls.
+
+**Transfer** opens a contact search. **Transfer now** hands the call over
+directly (blind). **Call first** holds the call and rings the recipient; the new
+call card then offers **Complete transfer** (attended transfer with Replaces) or
+**Cancel and return**, which hangs up the consultation and resumes the caller.
 Transfer requires peer support for REFER; acceptance of REFER alone does not end
 the original call. Final successful transfer notification releases the original
 leg and, for attended transfer, its consultation leg. Failure leaves the calls
@@ -113,8 +120,8 @@ unavailability. Local Ctrl+1…6 navigation and Ctrl+K dialer focus work indepen
 | Media | RTP/RTCP, bounded jitter buffering, loss/jitter/RTT statistics, RFC 4733 DTMF, SDES and DTLS SRTP/SRTCP, ICE/STUN/TURN and transport-only ICE restart | No trickle ICE; no mid-call DTLS identity/association replacement; arbitrary NAT paths remain deployment-dependent |
 | Codecs | Opus, G.722, PCMA and PCMU; mid-call changes retain device PCM, recording and conference state | Sample-rate conversion requires SpeexDSP. The Nix package includes Opus and SpeexDSP |
 | Audio | PulseAudio/PipeWire-Pulse, ALSA fallback, device tests/levels/gain, SpeexDSP echo/noise processing, recovery, conferences and recording | Native shared mixing and daemon-loss shutdown tested with virtual devices; hardware latency, echo and hotplug quality require physical devices |
-| Presence | PIDF publication with refresh/withdrawal, dialog/busy-lamp state, voicemail indication and Swyx Classic status reception | Permissions depend on server; custom Swyx status publication lacks a verified contract |
-| Messaging | SIP text MESSAGE, searchable/paged conversations, local unread counts, explicit retry and retention | No proprietary Swyx Messenger provider, attachments or remote read receipts |
+| Presence | PIDF publication with refresh/withdrawal, dialog/busy-lamp state, voicemail indication, Swyx Classic status reception, Swyx own status/DND/status text and colleague status text via the SwyxWare client API, away while the screen is locked | Permissions depend on server; the Swyx API login uses the SIP credentials |
+| Messaging | SIP text MESSAGE when the server allows it, searchable/paged chats, local unread counts, explicit retry and retention | No Swyx Messenger provider (SwyxWare rejects SIP MESSAGE), attachments or remote read receipts |
 | Contacts | Multiple labeled numbers, favorites, CSV field mapping, CSV/vCard preview/import/export, LDAP discovery and cached synchronization | DNS/root-DSE discovery needs a company domain or configured endpoint; proprietary Swyx directory APIs are unverified |
 | Desktop | Multiple accounts/calls, asynchronous call setup, history, DND, URI activation, notification actions, tray, autostart, wallet, suspend/network recovery and optional portal shortcuts | Desktop capabilities and portal consent depend on the session; full physical-desktop acceptance remains separate |
 
@@ -189,10 +196,16 @@ mobile and external numbers are marked separately.
 Configure the provider under **Accounts → Edit → Provider compatibility and
 voicemail → Presence** (Automatic or Swyx for this adapter).
 
-To publish your own standard SIP availability, open **Your status & voicemail**
-in **Overview** or **Phone**, enter a status message and select **Set available**
-or **Set unavailable**. These controls do **not** set Swyx-specific custom statuses.
-The app's **Do not disturb** switch controls local incoming-call handling separately.
+To set your own status, open **Your status & voicemail** in **Overview** or
+**Phone**, enter a status text and select **Set available** or **Set away**.
+On SwyxWare this writes the Swyx status (see below); elsewhere it is published as
+standard SIP presence. **Do not disturb** rejects incoming calls locally and,
+on SwyxWare, also sets the Swyx do-not-disturb status. While the screen is
+locked you show as away; see **Audio & settings → Preferences** to turn this off
+or to set your own lock check command (exit status 0 = locked). Without a
+command, Voiper detects hyprlock, swaylock, gtklock, waylock, i3lock and other
+locker processes, the GNOME and KDE/freedesktop screensaver interfaces and
+logind's `LockedHint`, which covers GNOME, KDE, niri, sway and Hyprland setups.
 
 The left navigation collapses to icons in smaller windows. **Overview** combines
 the dialer and active calls with a short recent-people list. Selecting a recent
@@ -200,7 +213,9 @@ person fills the number and outgoing account; press **Call** to dial. The full
 phonebook, search and colleague status remain in **Contacts**.
 
 Connection details, logs and diagnostic export are available from the three
-icons at the bottom right. The live panel closes with its close button or Escape.
+icons at the bottom right. Media errors that do not stop a call, such as
+isolated RTP packet loss or decoder concealment, appear only in the live
+diagnostics panel; the call card shows media problems only when no audio flows. The live panel closes with its close button or Escape.
 
 Choose Standard, Dialog/busy-lamp, Swyx or Disabled per account. Status publication
 uses standard PIDF PUBLISH, refreshes using the server-granted lifetime, and recovers
@@ -213,11 +228,26 @@ Terminal permission/resource rejections stay unknown until explicitly watched ag
 refreshes active publications. The fork does not establish how to publish Swyx
 custom states. Publication follows [RFC 3903](https://www.rfc-editor.org/rfc/rfc3903).
 
-The fork adds no proprietary messaging transport. Auto messaging currently uses
-standard SIP MESSAGE; explicitly selecting an unavailable Swyx messaging provider
-reports that limitation. Swyx's newer Messenger is a separate service and is not
-implemented. Neither an HTTP API nor a custom SIP dialect is invented from a
-server name. No live Swyx server was available for validation.
+### SwyxWare status through the client API
+
+After registering, Voiper asks the registrar for its methods (SIP OPTIONS).
+SwyxWare 14.21 lists neither PUBLISH nor MESSAGE and answers both with 405, so
+for Swyx accounts own status, do not disturb and status text go through the
+SwyxWare client REST API on port 9100, the same API SwyxIt! uses
+([evidence](internal/compat/swyx/PROTOCOL.md#live-server-probe-2026-10-15)).
+It logs in with the account's SIP user name and password; if Swyx uses a
+different password for the client login, the account shows the rejection under
+diagnostics. The server's self-signed certificate is trusted on first use and
+pinned; a changed certificate is refused until you confirm **Trust the new
+server certificate**. An account CA file, when configured, is used instead.
+Voiper only writes the fields you change, so a status set in SwyxIt! survives
+starting Voiper. The same API supplies the colleagues' status text, which
+completes the SIP status on contact cards and in chats.
+
+Chat follows the same probe: servers that allow MESSAGE use SIP chat. SwyxWare
+does not, and its chat runs on Swyx Messenger (Classic IM or the Coligo
+service), whose wire protocol is not part of the client API and is not
+implemented; the chat view says so instead of sending messages that fail.
 
 ## Contacts and company directory
 

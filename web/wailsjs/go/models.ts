@@ -6,6 +6,8 @@ export namespace app {
 	    CloseToBackground: boolean;
 	    Autostart: boolean;
 	    MessageRetentionDays: number;
+	    KeepStatusWhenLocked: boolean;
+	    ScreenLockCommand: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Preferences(source);
@@ -18,6 +20,8 @@ export namespace app {
 	        this.CloseToBackground = source["CloseToBackground"];
 	        this.Autostart = source["Autostart"];
 	        this.MessageRetentionDays = source["MessageRetentionDays"];
+	        this.KeepStatusWhenLocked = source["KeepStatusWhenLocked"];
+	        this.ScreenLockCommand = source["ScreenLockCommand"];
 	    }
 	}
 	export class DesktopSettings {
@@ -163,6 +167,8 @@ export namespace config {
 	    MessagingMode: string;
 	    DTMFMode: string;
 	    Voicemail: string;
+	    SwyxUsername: string;
+	    SwyxPassword: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -200,6 +206,8 @@ export namespace config {
 	        this.MessagingMode = source["MessagingMode"];
 	        this.DTMFMode = source["DTMFMode"];
 	        this.Voicemail = source["Voicemail"];
+	        this.SwyxUsername = source["SwyxUsername"];
+	        this.SwyxPassword = source["SwyxPassword"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -535,6 +543,8 @@ export namespace phone {
 	    State: string;
 	    Error: string;
 	    Capabilities: swyx.Capabilities;
+	    SwyxAPI: string;
+	    SwyxAPIError: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AccountState(source);
@@ -551,6 +561,8 @@ export namespace phone {
 	        this.State = source["State"];
 	        this.Error = source["Error"];
 	        this.Capabilities = this.convertValues(source["Capabilities"], swyx.Capabilities);
+	        this.SwyxAPI = source["SwyxAPI"];
+	        this.SwyxAPIError = source["SwyxAPIError"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -579,6 +591,7 @@ export namespace phone {
 	    State: string;
 	    Error: string;
 	    TransferStatus: string;
+	    ConsultationFor: string;
 	    Muted: boolean;
 	    Held: boolean;
 	    // Go type: time
@@ -600,6 +613,7 @@ export namespace phone {
 	        this.State = source["State"];
 	        this.Error = source["Error"];
 	        this.TransferStatus = source["TransferStatus"];
+	        this.ConsultationFor = source["ConsultationFor"];
 	        this.Muted = source["Muted"];
 	        this.Held = source["Held"];
 	        this.Started = this.convertValues(source["Started"], null);
@@ -722,6 +736,7 @@ export namespace phone {
 	    Accounts: AccountState[];
 	    Calls: CallState[];
 	    DND: boolean;
+	    ScreenLocked: boolean;
 	    Audio: media.Settings;
 	    Presence: Presence[];
 	
@@ -735,6 +750,7 @@ export namespace phone {
 	        this.Accounts = this.convertValues(source["Accounts"], AccountState);
 	        this.Calls = this.convertValues(source["Calls"], CallState);
 	        this.DND = source["DND"];
+	        this.ScreenLocked = source["ScreenLocked"];
 	        this.Audio = this.convertValues(source["Audio"], media.Settings);
 	        this.Presence = this.convertValues(source["Presence"], Presence);
 	    }
@@ -1242,6 +1258,7 @@ export namespace swyx {
 	    SwyxDetected: boolean;
 	    Presence: string;
 	    Messaging: string;
+	    Status: string;
 	    Directory: string;
 	    Detail: string;
 	
@@ -1255,6 +1272,7 @@ export namespace swyx {
 	        this.SwyxDetected = source["SwyxDetected"];
 	        this.Presence = source["Presence"];
 	        this.Messaging = source["Messaging"];
+	        this.Status = source["Status"];
 	        this.Directory = source["Directory"];
 	        this.Detail = source["Detail"];
 	    }

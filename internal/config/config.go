@@ -58,6 +58,11 @@ type Config struct {
 	MessagingMode    string        `toml:"messaging_mode,omitempty"`
 	DTMFMode         string        `toml:"dtmf_mode,omitempty"`
 	Voicemail        string        `toml:"voicemail,omitempty"`
+	// Swyx client-API login, used for status and chat when the server is a Swyx
+	// PBX. It is a separate identity (usually the Windows/AD account), not the
+	// SIP user name. SwyxPassword follows the wallet like Password.
+	SwyxUsername string `toml:"swyx_username,omitempty"`
+	SwyxPassword string `toml:"swyx_password,omitempty"`
 }
 
 func Path(base, name string) (string, error) {

@@ -68,6 +68,8 @@
     CloseToBackground: false,
     Autostart: false,
     MessageRetentionDays: 0,
+    KeepStatusWhenLocked: false,
+    ScreenLockCommand: "",
   });
   let desktopCapabilities = $state({});
   let globalShortcuts = $state({
@@ -827,6 +829,7 @@
     {:else if page === "messages"}
       <Messages
         {account}
+        {snapshot}
         bind:target
         {run}
         {busy}
@@ -893,6 +896,25 @@
                 ]}
               /></label
             >
+            <label class={ui.checkLabel}
+              ><input class={ui.checkbox}
+                type="checkbox"
+                checked={!preferences.KeepStatusWhenLocked}
+                onchange={(e) => (preferences.KeepStatusWhenLocked = !e.currentTarget.checked)}
+              /> Show me as away while the screen is locked</label
+            >
+            <label class={ui.label}
+              >Screen lock check<input class={ui.field}
+                placeholder="Automatic: hyprlock, swaylock, GNOME, KDE, logind"
+                disabled={preferences.KeepStatusWhenLocked}
+                bind:value={preferences.ScreenLockCommand}
+              /></label
+            >
+            <p class={ui.hint}>
+              Leave empty to detect common lock screens. A command replaces the
+              detection: exit status 0 means locked, 1 unlocked, for example
+              <code>pidof hyprlock</code>.
+            </p>
             <p class={ui.hint}>
               Saving a retention limit deletes older messages from this device.
               Autostart uses this installed executable.

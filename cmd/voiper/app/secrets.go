@@ -21,6 +21,17 @@ func secretAccount(path string) string {
 	key := sha256.Sum256([]byte(absolute))
 	return hex.EncodeToString(key[:])
 }
+
+// swyxSecretAccount is the wallet entry for the account's Swyx client-API
+// password, kept separate from the SIP password.
+func swyxSecretAccount(path string) string {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		absolute = path
+	}
+	key := sha256.Sum256([]byte(absolute + "\x00swyx"))
+	return hex.EncodeToString(key[:])
+}
 func (a *App) secretService() (*desktop.Service, error) {
 	a.mu.Lock()
 	service := a.desktop
@@ -47,6 +58,9 @@ func (a *App) DeleteSavedPassword(name string) error {
 	}
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
+	if err := service.DeleteSecret(ctx, swyxSecretAccount(path)); err != nil && !errors.Is(err, desktop.ErrSecretNotFound) {
+		return err
+	}
 	return service.DeleteSecret(ctx, secretAccount(path))
 }
 

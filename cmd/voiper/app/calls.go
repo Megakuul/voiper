@@ -30,3 +30,8 @@ func (a *App) startCall(action func() error) error {
 	}()
 	return nil
 }
+
+// Consult calls a transfer target and keeps the call id on hold meanwhile.
+func (a *App) Consult(id, target string) error {
+	return a.startCall(func() error { return a.phone.Consult(id, target) })
+}

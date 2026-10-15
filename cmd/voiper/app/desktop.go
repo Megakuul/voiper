@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -46,6 +48,7 @@ func (a *App) runDesktop() {
 	runtime.EventsEmit(a.ctx, "desktop-ready", nil)
 	a.directory.Refresh()
 	a.startWork(a.enableStartupAccounts)
+	a.startWork(a.watchScreenLock)
 	notifications := map[string]bool{}
 	for {
 		select {
@@ -135,6 +138,38 @@ func (a *App) runDesktop() {
 				runtime.EventsEmit(a.ctx, "desktop-warning", "Desktop notification could not be shown")
 			}
 		}
+	}
+}
+
+// watchScreenLock reports the screen lock to the phone, which shows the user
+// as away while locked. A failing custom command is logged once per message.
+func (a *App) watchScreenLock() {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	lastError := ""
+	for {
+		select {
+		case <-a.ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		a.mu.Lock()
+		keep, command := a.preferences.KeepStatusWhenLocked, a.preferences.ScreenLockCommand
+		a.mu.Unlock()
+		locked := false
+		if !keep {
+			ctx, cancel := context.WithTimeout(a.ctx, 2*time.Second)
+			var err error
+			locked, err = desktop.ScreenLocked(ctx, command)
+			cancel()
+			if message := fmt.Sprint(err); err != nil && message != lastError {
+				slog.Warn("Could not check the screen lock", "error", err)
+				lastError = message
+			} else if err == nil {
+				lastError = ""
+			}
+		}
+		a.phone.SetScreenLocked(locked)
 	}
 }
 func (a *App) startWork(fn func()) {

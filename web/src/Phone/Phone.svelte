@@ -1,9 +1,9 @@
 <script>
   import { ui } from "../ui.js";
   import Icon from "../components/Icon.svelte";
-  import Dropdown from "../components/Dropdown.svelte";
   import ContactCard from "../Contacts/ContactCard.svelte";
-  import { extensionOf } from "../Contacts/presence.js";
+  import CallTargetPicker from "./CallTargetPicker.svelte";
+  import { extensionOf, statusStyle } from "../Contacts/presence.js";
   import * as api from "../../wailsjs/go/app/App.js";
   let {
     snapshot,
@@ -43,6 +43,7 @@
         .map((p) => [p.Target, p]),
     ),
   );
+  let currentAccount = $derived(snapshot.Accounts.find((a) => a.Name === account));
   let accountRegistered = $derived(
     snapshot.Accounts.some((a) => a.Name === account && a.State === "registered"),
   );
@@ -53,20 +54,50 @@
   });
   const statRow = "flex justify-between gap-4 py-[0.6rem] border-b border-border";
   const statValue = "m-0 min-w-0 text-right wrap-anywhere";
-  let transfer = $state({});
-  let tones = $state({});
   let toneNotices = $state({});
   let showStats = $state(false);
-  let consult = $state({});
+  // The open tool of each call: "transfer", "add", "keypad" or "more".
+  let panel = $state({});
   let statusNote = $state("");
   let restarting = $state({});
   let restartErrors = $state({});
-  let activeCalls = $derived(
-    snapshot.Calls.filter((call) => call.State === "connected" && !call.Held),
-  );
+  let connectedCalls = $derived(snapshot.Calls.filter((call) => call.State === "connected"));
   let hasConference = $derived(
     snapshot.Calls.some((call) => call.Stats?.Conference),
   );
+  let callsByID = $derived(new Map(snapshot.Calls.map((call) => [call.ID, call])));
+
+  function togglePanel(id, name) {
+    panel[id] = panel[id] === name ? "" : name;
+    toneNotices[id] = "";
+  }
+  // "sip:318@pbx" shows as 318; the full address stays available as a title.
+  function remoteName(remote) {
+    return (remote || "").replace(/^sips?:/, "").replace(/@.*$/, "") || remote;
+  }
+  function stateLabel(call) {
+    if (call.Held) return "On hold";
+    return (
+      {
+        preparing: "Preparing…",
+        calling: "Calling…",
+        ringback: "Ringing…",
+        ringing: "Incoming call",
+        answering: "Answering…",
+        connecting: "Connecting…",
+        connected: "Connected",
+      }[call.State] || call.State
+    );
+  }
+  // Only problems that stop the call's audio reach the call view; other media
+  // errors, such as isolated packet loss, are listed in the diagnostics panel.
+  function blockingMediaWarning(stats) {
+    return stats?.MediaFlow === "no-media" || stats?.MediaFlow === "device-unavailable" ? stats.MediaWarning : "";
+  }
+  async function sendTone(call, digit) {
+    await api.SendDTMF(call.ID, digit);
+    toneNotices[call.ID] = `${toneNotices[call.ID] || "Sent "}${digit}`;
+  }
 
   $effect(() => {
     const active = new Set(snapshot.Calls.map((call) => call.ID));
@@ -186,26 +217,6 @@
 <div class={["flex flex-col", workspace ? "gap-0" : "gap-6"]}>
   <!-- Without calls, the dialer comes first. -->
   <section class={snapshot.Calls.length === 0 && "order-1"}>
-    {#if snapshot.Calls.filter((c) => c.State === "connected").length >= 2 || hasConference}<div
-        class={[ui.row, "flex-wrap"]}
-      >
-        <button class={ui.button}
-          disabled={busy ||
-            hasConference ||
-            activeCalls.length < 2 ||
-            activeCalls.length > 3}
-          onclick={() =>
-            run(() => api.Conference(activeCalls.map((call) => call.ID)))}
-          >Merge active calls</button
-        >
-        {#if hasConference}<button class={ui.button}
-            disabled={busy}
-            onclick={() => run(() => api.LeaveConference())}
-            >Separate conference</button
-          >{:else}<p class={ui.hint}>
-            Merge two or three active calls. Resume held calls before merging.
-          </p>{/if}
-      </div>{/if}
     {#if snapshot.Calls.length || !workspace}<div class="flex flex-wrap items-center justify-between gap-4 wrap-anywhere">
       <h2 class="m-0 text-[1.15rem] font-semibold">{snapshot.Calls.length ? "Current calls" : "Calls"}</h2>
       {#if snapshot.Calls.length}<button
@@ -216,249 +227,187 @@
         >{/if}
     </div>
     {/if}
+    {#if connectedCalls.length >= 2 || hasConference}
+      <div class="flex flex-wrap items-center gap-4 mt-4 px-5 py-4 rounded-[8px] border border-brand-border bg-accent-surface">
+        <span class="grid place-items-center size-[40px] rounded-full bg-brand text-white"><Icon name="conference" size={20} /></span>
+        <div class="flex-1 min-w-[180px]">
+          <h3 class={ui.h3}>{hasConference ? "Conference" : `${connectedCalls.length} calls in progress`}</h3>
+          <p class={ui.hint}>
+            {#if hasConference}Everyone in the conference hears each other.
+            {:else if connectedCalls.length > 3}Merge supports up to three calls; hang up the others first.
+            {:else}Merge them so everyone can talk together. Calls on hold resume automatically.{/if}
+          </p>
+        </div>
+        {#if hasConference}<button class={ui.button} disabled={busy} onclick={() => run(() => api.LeaveConference())}
+            >Split conference</button
+          >{:else}<button class={ui.primaryButton}
+            disabled={busy || connectedCalls.length > 3}
+            onclick={() => run(() => api.Conference(connectedCalls.map((call) => call.ID)))}>Merge into conference</button
+          >{/if}
+      </div>
+    {/if}
     {#each snapshot.Calls as call (call.ID)}
-      <article class={["min-w-0 rounded-[6px] border border-border [&>p]:mb-4", workspace ? "p-5 mb-6 bg-surface-inset" : "p-6 mt-4 bg-surface shadow-panel border-t-panel-edge max-[700px]:p-[1.15rem]"]}>
-        <span class="text-muted text-[0.78rem]"
-          >{call.Account} · {call.Direction === "incoming"
-            ? "Incoming call"
-            : "Outgoing call"}</span
-        >
-        <h2 class="mx-0 mt-4 mb-4 text-[1.15rem] font-semibold wrap-anywhere">{call.Remote}</h2>
-        <div class={ui.row}>
-          <span class={ui.badge}
-            >{call.Held
-              ? "On hold"
-              : {
-                  connected: "Connected",
-                  ringing: "Incoming call",
-                  dialing: "Calling…",
-                  connecting: "Connecting…",
-                }[call.State] || call.State}</span
-          >{#if call.Muted}<span class={ui.badge}>Microphone muted</span
-            >{/if}{#if call.Stats?.Conference}<span class={ui.badge}
-              >Conference</span
-            >{/if}
-        </div>
-        {#if call.TransferStatus}<p class={ui.text} role="status">
-            Transfer: {call.TransferStatus}
-          </p>{/if}
-        {#if call.Stats?.AudioStopped}<p class={ui.error} role="alert">
-            Audio device stopped. {call.Stats.AudioRecovering
-              ? "Reconnecting…"
-              : call.Stats.AudioRecoveryError ||
-                "Automatic recovery is paused."}
-            <button class={ui.button}
-              disabled={busy ||
-                call.Stats.AudioRecovering ||
-                call.Stats.AudioRecoveryPending}
-              onclick={() => run(() => api.RetryAudio(call.ID))}
-              >Retry audio</button
-            >
-          </p>{/if}
-        {#if call.Stats?.LastError}<p class={ui.error} role="alert">
-            Audio: {call.Stats.LastError}
-          </p>{/if}
-        {#if call.Stats?.MediaWarning}<p class={ui.error} role="status">
-            {call.Stats.MediaWarning}
-          </p>{/if}
-        {#if call.State === "connected" && call.Stats?.ICECandidateType}
-          <div class={[ui.row, "flex-wrap"]}>
-            <button class={ui.button}
-              disabled={busy ||
-                restarting[call.ID] ||
-                call.Stats.ICERestartPending}
-              onclick={() => restartPath(call.ID)}
-              >Reconnect network audio</button
-            >
-            {#if restarting[call.ID] || call.Stats.ICERestartPending}<span
-                class="text-muted text-[0.78rem]"
-                role="status">Checking a new audio path…</span
-              >{/if}
+      {@const original = callsByID.get(call.ConsultationFor)}
+      {@const consultation = snapshot.Calls.find((c) => c.ConsultationFor === call.ID)}
+      {@const warning = blockingMediaWarning(call.Stats)}
+      <article class={["min-w-0 rounded-[8px] border", call.State === "ringing" ? "border-brand-border" : "border-border", workspace ? "p-5 mt-4 mb-2 bg-surface-inset" : "p-6 mt-4 bg-surface shadow-panel border-t-panel-edge max-[700px]:p-[1.15rem]"]}>
+        <header class="flex items-center gap-4 min-w-0">
+          <span class={["grid place-items-center shrink-0 size-[48px] rounded-full border", call.State === "connected" && !call.Held ? "bg-accent-surface text-accent-text border-brand-border" : "bg-control text-muted border-control-border"]}>
+            <Icon name={call.Stats?.Conference ? "conference" : call.Direction === "incoming" ? "incoming" : "outgoing"} size={22} />
+          </span>
+          <div class="flex-1 min-w-0">
+            <p class="m-0 text-[0.75rem] text-muted">{call.Account} · {call.Direction === "incoming" ? "Incoming" : "Outgoing"}{call.Stats?.Conference ? " · in conference" : ""}</p>
+            <h3 class="m-0 text-[1.2rem] font-semibold truncate" title={call.Remote}>{remoteName(call.Remote)}</h3>
+            <p class="m-0 text-[0.78rem] text-subtle truncate">{call.Remote}</p>
           </div>
-          {#if restartErrors[call.ID]}<p class={ui.error} role="alert">
-              {restartErrors[call.ID]}
-            </p>{/if}
+          <div class="flex flex-col items-end gap-1 shrink-0">
+            <span class={[ui.badge, call.Held && "text-[#f5cb7d]", call.State === "connected" && !call.Held && "text-[#7fe0ad]"]}>{stateLabel(call)}</span>
+            {#if call.Connected && !call.Connected.startsWith("0001-")}<span class="text-[0.8rem] text-muted tabular-nums">{duration(call.Connected)}</span>{/if}
+            {#if call.Muted}<span class="text-[0.75rem] text-[#f3909e]">Muted</span>{/if}
+          </div>
+        </header>
+
+        {#if original}
+          <div class="flex flex-wrap items-center gap-3 mt-4 px-4 py-3 rounded-[6px] border border-brand-border bg-accent-surface">
+            <Icon name="transfer" size={18} />
+            <span class="flex-1 min-w-[160px] text-[0.9rem]">Transfer of <strong>{remoteName(original.Remote)}</strong> — talk to {remoteName(call.Remote)} first, then connect them.</span>
+            <button class={ui.primaryButton} disabled={busy || call.State !== "connected"}
+              onclick={() => run(() => api.AttendedTransfer(original.ID, call.ID))}>Complete transfer</button>
+            <button class={ui.button} disabled={busy}
+              onclick={() => run(async () => {
+                await api.Hangup(call.ID);
+                if (original.Held) await api.Hold(original.ID, false);
+              })}>Cancel and return</button>
+          </div>
+        {:else if consultation}
+          <p class={[ui.hint, "mt-4"]}>Waiting while you talk to {remoteName(consultation.Remote)} about the transfer.</p>
         {/if}
-        {#if call.Connected && !call.Connected.startsWith("0001-")}<p
-            class={ui.hint}
-          >
-            Connected · {duration(call.Connected)}
-          </p>{/if}
-        {#if call.Error}<p class={ui.error}>{call.Error}</p>{/if}
-        <div class={[ui.row, "flex-wrap mt-6"]}>
-          {#if call.State === "ringing"}<button
-              class={ui.primaryButton}
-              disabled={busy}
-              onclick={() => run(() => api.Answer(call.ID))}>Answer</button
-            >{/if}
-          {#if call.State === "connected"}<button class={[ui.button, "aria-pressed:text-accent-text aria-pressed:border-accent"]}
-              disabled={busy}
-              onclick={() => run(() => api.Mute(call.ID, !call.Muted))}
-              aria-pressed={call.Muted}
-              >{call.Muted ? "Unmute microphone" : "Mute microphone"}</button
-            ><button class={[ui.button, "aria-pressed:text-accent-text aria-pressed:border-accent"]}
-              disabled={busy}
-              onclick={() => run(() => api.Hold(call.ID, !call.Held))}
-              aria-pressed={call.Held}
-              >{call.Held ? "Resume call" : "Hold call"}</button
-            >{/if}
-          <button class={ui.dangerButton} onclick={() => run(() => api.Hangup(call.ID))}
-            >{call.State === "ringing" ? "Decline" : "Hang up"}</button
-          >
+        {#if call.TransferStatus}<p class={[ui.text, "mt-4"]} role="status">Transfer: {call.TransferStatus}</p>{/if}
+        {#if call.Stats?.AudioStopped}
+          <div class="flex flex-wrap items-center gap-3 mt-4" role="alert">
+            <p class={[ui.error, "flex-1"]}>
+              Audio device stopped. {call.Stats.AudioRecovering ? "Reconnecting…" : call.Stats.AudioRecoveryError || "Automatic recovery is paused."}
+            </p>
+            <button class={ui.button} disabled={busy || call.Stats.AudioRecovering || call.Stats.AudioRecoveryPending}
+              onclick={() => run(() => api.RetryAudio(call.ID))}>Retry audio</button>
+          </div>
+        {/if}
+        {#if warning}<p class={[ui.error, "mt-4"]} role="status">{warning}</p>{/if}
+        {#if call.Error}<p class={[ui.error, "mt-4"]}>{call.Error}</p>{/if}
+
+        <div class="flex flex-wrap items-start gap-2 mt-5">
+          {#if call.State === "ringing"}
+            <button class={[ui.primaryButton, "inline-flex items-center gap-2"]} disabled={busy}
+              onclick={() => run(() => api.Answer(call.ID))}><Icon name="phone" size={18} /> Answer</button>
+            <button class={[ui.button, "inline-flex items-center gap-2"]} aria-pressed={panel[call.ID] === "redirect"}
+              onclick={() => togglePanel(call.ID, "redirect")}><Icon name="transfer" size={18} /> Redirect</button>
+          {/if}
+          {#if call.State === "connected"}
+            {#snippet control(label, icon, pressed, onclick, disabled = false)}
+              <button
+                class="
+                  flex flex-col items-center gap-[0.35rem] w-[76px] py-2 rounded-[8px] border border-transparent
+                  text-[0.75rem] text-muted cursor-pointer outline-offset-2 transition-colors duration-100
+                  enabled:hover:bg-control-hover enabled:hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed
+                  aria-pressed:bg-accent-surface aria-pressed:border-brand-border aria-pressed:text-accent-text
+                "
+                aria-pressed={pressed}
+                disabled={busy || disabled}
+                {onclick}
+              ><span class="grid place-items-center size-[40px] rounded-full bg-control border border-control-border"><Icon name={icon} size={19} /></span>{label}</button>
+            {/snippet}
+            {@render control(call.Muted ? "Unmute" : "Mute", call.Muted ? "microphone-off" : "microphone", call.Muted, () => run(() => api.Mute(call.ID, !call.Muted)))}
+            {@render control(call.Held ? "Resume" : "Hold", "pause", call.Held, () => run(() => api.Hold(call.ID, !call.Held)))}
+            {@render control("Keypad", "dialpad", panel[call.ID] === "keypad", () => togglePanel(call.ID, "keypad"), call.Held)}
+            {@render control("Transfer", "transfer", panel[call.ID] === "transfer", () => togglePanel(call.ID, "transfer"), Boolean(original))}
+            {@render control("Add person", "user-plus", panel[call.ID] === "add", () => togglePanel(call.ID, "add"), connectedCalls.length >= 3)}
+            {@render control("More", "settings", panel[call.ID] === "more", () => togglePanel(call.ID, "more"))}
+          {/if}
+          <button class={[ui.dangerButton, "inline-flex items-center gap-2 ml-auto self-center"]} onclick={() => run(() => api.Hangup(call.ID))}
+            ><Icon name="phone" size={18} /> {call.State === "ringing" ? "Decline" : "Hang up"}</button>
         </div>
-        {#if call.State === "ringing"}<form
-            class={ui.row}
-            onsubmit={(e) => {
-              e.preventDefault();
-              run(() => api.Redirect(call.ID, transfer[call.ID] || ""));
-            }}
-          >
-            <input class={ui.field}
-              aria-label="Redirect destination"
-              placeholder="Redirect destination"
-              bind:value={transfer[call.ID]}
-            /><button class={ui.button} disabled={busy || !transfer[call.ID]}>Redirect</button>
-          </form>{/if}
-        {#if call.State === "connected"}
-          <details class={[ui.details, "mt-5 pt-4 border-t border-border"]}>
-            <summary class={ui.summary}>Phone menu (DTMF)</summary>
-            <form
-              class="stack flex flex-col gap-3 items-stretch max-w-[440px] flex-wrap [&>label]:flex-1 [&>label]:min-w-[min(220px,_100%)]"
-              onsubmit={(event) => {
-                event.preventDefault();
-                const digit = (tones[call.ID] || "").trim().toUpperCase();
-                if (busy || call.Held || !/^[0-9*#ABCD]$/.test(digit)) return;
-                run(async () => {
-                  toneNotices[call.ID] = "";
-                  await api.SendDTMF(call.ID, digit);
-                  tones[call.ID] = "";
-                  toneNotices[call.ID] = `Sent ${digit}.`;
-                });
-              }}
-            >
-              <label class={ui.label} for={`tone-${call.ID}`}>Menu digit</label>
-              <div class={ui.row}>
-                <input class={ui.field}
-                  id={`tone-${call.ID}`}
-                  placeholder="0–9, * or #"
-                  maxlength="1"
-                  autocomplete="off"
-                  bind:value={tones[call.ID]}
-                />
-                <button class={ui.button}
-                  disabled={busy ||
-                    call.Held ||
-                    !/^[0-9*#ABCD]$/i.test(tones[call.ID] || "")}
-                  >Send digit</button
-                >
-              </div>
-              <p class={ui.hint}>
-                Type a digit and press Enter to send it to the call’s phone
-                menu.{call.Held ? " Resume the call first." : ""}
-              </p>
-              {#if toneNotices[call.ID]}<p class="m-0 leading-[1.6] text-[0.78rem]" role="status">
-                  {toneNotices[call.ID]}
-                </p>{/if}
-            </form>
-          </details>
-          <details class={[ui.details, "mt-5 pt-4 border-t border-border"]}>
-            <summary class={ui.summary}>Transfer call</summary>
-            <form
-              class={ui.row}
-              onsubmit={(e) => {
-                e.preventDefault();
-                run(() => api.Transfer(call.ID, transfer[call.ID] || ""));
-              }}
-            >
-              <input class={ui.field}
-                aria-label="Number or SIP address to transfer to"
-                placeholder="Number or SIP address"
-                bind:value={transfer[call.ID]}
-              /><button class={ui.button} disabled={busy || !transfer[call.ID]}
-                >Transfer now</button
-              >
-            </form>
-            <p class={ui.hint}>
-              To speak with the recipient first, hold this call and start a
-              second call. Then choose that call below.
-            </p>
-            <div class={[ui.row, "flex-wrap"]}>
-              <Dropdown
-                label="Consultation call"
-                bind:value={consult[call.ID]}
-                disabled={busy}
-                options={[
-                  { value: "", label: "Choose consultation call" },
-                  ...snapshot.Calls.filter(
-                    (c) =>
-                      c.ID !== call.ID &&
-                      c.Account === call.Account &&
-                      c.State === "connected",
-                  ).map((other) => ({ value: other.ID, label: other.Remote })),
-                ]}
-              /><button class={ui.button}
-                disabled={busy || !consult[call.ID]}
-                onclick={() =>
-                  run(() => api.AttendedTransfer(call.ID, consult[call.ID]))}
-                >Complete transfer</button
-              >
+
+        {#if panel[call.ID] === "redirect" && call.State === "ringing"}
+          <CallTargetPicker
+            account={call.Account}
+            {snapshot}
+            {busy}
+            title="Redirect incoming call"
+            hint="The caller is sent to this destination without being answered."
+            actions={[{ label: "Redirect", primary: true, run: (to) => run(() => api.Redirect(call.ID, to)) }]}
+            onclose={() => (panel[call.ID] = "")}
+          />
+        {:else if panel[call.ID] === "transfer" && call.State === "connected"}
+          {@const others = connectedCalls.filter((c) => c.ID !== call.ID && c.Account === call.Account)}
+          <CallTargetPicker
+            account={call.Account}
+            {snapshot}
+            {busy}
+            title={`Transfer ${remoteName(call.Remote)}`}
+            hint="Call first puts this call on hold and rings the recipient, so you can announce the caller before you connect them."
+            actions={[
+              { label: "Transfer now", run: (to) => run(async () => { await api.Transfer(call.ID, to); panel[call.ID] = ""; }) },
+              { label: "Call first", primary: true, run: (to) => run(async () => { await api.Consult(call.ID, to); panel[call.ID] = ""; }) },
+            ]}
+            onclose={() => (panel[call.ID] = "")}
+          />
+          {#if others.length}
+            <div class="flex flex-wrap items-center gap-2 mt-3">
+              <span class={ui.hint}>Or connect with a call in progress:</span>
+              {#each others as other (other.ID)}
+                <button class={ui.button} disabled={busy} onclick={() => run(() => api.AttendedTransfer(call.ID, other.ID))}>{remoteName(other.Remote)}</button>
+              {/each}
             </div>
-            <p class={ui.hint}>
-              Keep this call open until the transfer succeeds. Transfers require
-              support from the phone service.
-            </p>
-          </details>{/if}
-        {#if call.State === "connected"}<details class={[ui.details, "mt-5 pt-4 border-t border-border"]}>
-            <summary class={ui.summary}>Call volume & recording</summary><label class={ui.label}
-              >Microphone · {Math.round(
-                (call.Stats.InputGain ?? 1) * 100,
-              )}%<input class={ui.range}
-                type="range"
-                min="0"
-                max="2"
-                step="0.1"
+          {/if}
+        {:else if panel[call.ID] === "add" && call.State === "connected"}
+          <CallTargetPicker
+            account={call.Account}
+            {snapshot}
+            {busy}
+            title="Add a person to this call"
+            hint="This call waits on hold while you call. Merge the calls into a conference once they answer."
+            actions={[{ label: "Call", primary: true, run: (to) => run(async () => { await api.Dial(call.Account, to); panel[call.ID] = ""; }) }]}
+            onclose={() => (panel[call.ID] = "")}
+          />
+        {:else if panel[call.ID] === "keypad" && call.State === "connected"}
+          <div class="mt-5 p-4 rounded-[8px] border border-border bg-surface-inset">
+            <div class="grid grid-cols-3 gap-2 max-w-[260px] mx-auto">
+              {#each ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"] as digit}
+                <button class={[ui.button, "py-3 text-[1.1rem] tabular-nums"]} disabled={busy || call.Held}
+                  onclick={() => run(() => sendTone(call, digit))}>{digit}</button>
+              {/each}
+            </div>
+            <p class={[ui.hint, "mt-3 text-center"]} role="status">{toneNotices[call.ID] || "Digits go to the phone menu of this call."}</p>
+          </div>
+        {:else if panel[call.ID] === "more" && call.State === "connected"}
+          <div class="flex flex-col gap-4 mt-5 p-4 rounded-[8px] border border-border bg-surface-inset">
+            <label class={ui.label}
+              >Microphone · {Math.round((call.Stats.InputGain ?? 1) * 100)}%<input class={ui.range}
+                type="range" min="0" max="2" step="0.1"
                 value={call.Stats.InputGain ?? 1}
-                onchange={(e) =>
-                  run(() =>
-                    api.SetGain(
-                      call.ID,
-                      Number(e.currentTarget.value),
-                      call.Stats.OutputGain ?? 1,
-                    ),
-                  )}
-              /></label
-            ><label class={ui.label}
+                onchange={(e) => run(() => api.SetGain(call.ID, Number(e.currentTarget.value), call.Stats.OutputGain ?? 1))}
+              /></label>
+            <label class={ui.label}
               >Speaker · {Math.round((call.Stats.OutputGain ?? 1) * 100)}%<input class={ui.range}
-                type="range"
-                min="0"
-                max="2"
-                step="0.1"
+                type="range" min="0" max="2" step="0.1"
                 value={call.Stats.OutputGain ?? 1}
-                onchange={(e) =>
-                  run(() =>
-                    api.SetGain(
-                      call.ID,
-                      call.Stats.InputGain ?? 1,
-                      Number(e.currentTarget.value),
-                    ),
-                  )}
-              /></label
-            ><button class={ui.button}
-              disabled={busy}
-              onclick={() =>
-                run(() =>
-                  call.Stats.Recording
-                    ? api.StopRecording(call.ID)
-                    : api.StartRecording(call.ID),
-                )}
-              >{call.Stats.Recording
-                ? "Stop recording"
-                : "Record to WAV…"}</button
-            >{#if call.Stats.Recording}<p class={ui.text} role="status">
-                Recording · {call.Stats.RecordingPath}
-              </p>{/if}
-          </details>{/if}
-        {#if showStats}<dl class="mt-4 text-xs tabular-nums">
+                onchange={(e) => run(() => api.SetGain(call.ID, call.Stats.InputGain ?? 1, Number(e.currentTarget.value)))}
+              /></label>
+            <div class="flex flex-wrap items-center gap-3">
+              <button class={ui.button} disabled={busy}
+                onclick={() => run(() => (call.Stats.Recording ? api.StopRecording(call.ID) : api.StartRecording(call.ID)))}
+                >{call.Stats.Recording ? "Stop recording" : "Record to WAV…"}</button>
+              {#if call.Stats?.ICECandidateType}<button class={ui.button}
+                  disabled={busy || restarting[call.ID] || call.Stats.ICERestartPending}
+                  onclick={() => restartPath(call.ID)}>Reconnect network audio</button>{/if}
+            </div>
+            {#if call.Stats.Recording}<p class={ui.hint} role="status">Recording · {call.Stats.RecordingPath}</p>{/if}
+            {#if restarting[call.ID] || call.Stats.ICERestartPending}<p class={ui.hint} role="status">Checking a new audio path…</p>{/if}
+            {#if restartErrors[call.ID]}<p class={ui.error} role="alert">{restartErrors[call.ID]}</p>{/if}
+          </div>
+        {/if}
+
+        {#if showStats}<dl class="mt-5 text-xs tabular-nums">
             {#each statistics(call.Stats || {}) as [key, value]}<div class={statRow}>
                 <dt class="text-muted">{key}</dt>
                 <dd class={statValue}>{value}</dd>
@@ -606,43 +555,53 @@
           {p.Voicemail.Waiting ? "New voicemail" : "No new voicemail"} · {p
             .Voicemail.New} new / {p.Voicemail.Old} old · {p.State}
         </p>{/each}
-      <label class={ui.label}
-        >Your status message<input class={ui.field}
-          maxlength="512"
-          bind:value={statusNote}
-        /></label
-      >
-      <div class={[ui.row, "flex-wrap"]}>
-        <button class={ui.button}
-          disabled={busy || !account}
-          onclick={() =>
-            run(() => api.PublishStatus(account, true, statusNote))}
-          >Set available</button
-        ><button class={ui.button}
-          disabled={busy || !account}
-          onclick={() =>
-            run(() => api.PublishStatus(account, false, statusNote))}
-          >Set unavailable</button
-        ><button class={ui.button}
-          disabled={busy || !account}
-          onclick={() => run(() => api.UnpublishStatus(account))}
-          >Stop publishing</button
+      {#if currentAccount?.Capabilities?.Status === "unavailable"}
+        <p class={ui.hint}>This server does not accept a published status.</p>
+      {:else if currentAccount}
+        {@const own = statusStyle(snapshot.DND ? "dnd" : currentAccount.PresenceState || "unknown")}
+        <div class="flex items-center gap-2 text-[0.9rem]">
+          <span class={["size-[10px] rounded-full", own.dot]}></span>
+          <span class={own.text}>{currentAccount.PresenceState || snapshot.DND ? own.label : "Not set by Voiper"}</span>
+          {#if currentAccount.PresenceNote}<span class="text-muted truncate">· {currentAccount.PresenceNote}</span>{/if}
+        </div>
+        <label class={ui.label}
+          >Status text<input class={ui.field}
+            maxlength="512"
+            placeholder={currentAccount.PresenceNote || "For example: In a meeting until 14:00"}
+            bind:value={statusNote}
+          /></label
         >
-      </div>
-      {#each snapshot.Accounts.filter((a) => a.Name === account && a.PresenceState) as a}
-        <p class="m-0 leading-[1.6] text-[0.78rem]">
-          Published status: {a.PresenceState}{a.PresenceNote
-            ? ` · ${a.PresenceNote}`
-            : ""}
+        <div class={[ui.row, "flex-wrap"]}>
+          <button class={ui.button}
+            disabled={busy}
+            onclick={() => run(() => api.PublishStatus(account, true, statusNote))}
+            >Set available</button
+          ><button class={ui.button}
+            disabled={busy}
+            onclick={() => run(() => api.PublishStatus(account, false, statusNote))}
+            >Set away</button
+          ><button class={ui.quietButton}
+            disabled={busy}
+            onclick={() => run(() => api.UnpublishStatus(account))}
+            >{currentAccount.Capabilities?.Status === "swyx" ? "Reset status" : "Stop publishing"}</button
+          >
+        </div>
+        {#if currentAccount.PresenceError}<p class={[ui.hint, "text-danger"]}>{currentAccount.PresenceError}</p>{/if}
+        {#if currentAccount.SwyxAPIError}
+          <p class={[ui.hint, "text-danger"]}>{currentAccount.SwyxAPIError}</p>
+          {#if currentAccount.SwyxAPIError.includes("certificate")}<button class={ui.button}
+              disabled={busy}
+              onclick={() => run(() => api.TrustNewSwyxCertificate(account))}
+              >Trust the new server certificate</button
+            >{/if}
+        {/if}
+        <p class={ui.hint}>
+          {currentAccount.Capabilities?.Status === "swyx"
+            ? "Set on the Swyx server, so colleagues see it in SwyxIt! too."
+            : "Published with SIP while this account is enabled."}
+          Do not disturb also sets your status{snapshot.ScreenLocked ? "; the screen is locked, so you show as away" : ", and you show as away while the screen is locked"}.
         </p>
-        {#if a.PresenceError}<p class="m-0 leading-[1.6] text-[0.78rem] text-danger">
-            {a.PresenceError}
-          </p>{/if}
-      {/each}
-      <p class={ui.hint}>
-        Status refreshes while this account is enabled. Standard SIP publication
-        requires server support. This does not set Swyx custom statuses.
-      </p>
+      {/if}
     </details>
   </section>
 </div>

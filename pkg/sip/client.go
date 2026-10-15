@@ -553,8 +553,11 @@ func (c *Client) registrationAt(ctx context.Context, expiry time.Duration, retry
 	if expiry < time.Second {
 		return expiry, errors.New("registrar returned an expired registration")
 	}
+	// Some PBXs, SwyxWare among them, identify themselves with User-Agent in responses.
 	server := ""
 	if h := res.GetHeader("Server"); h != nil {
+		server = h.Value()
+	} else if h := res.GetHeader("User-Agent"); h != nil {
 		server = h.Value()
 	}
 	c.mu.Lock()

@@ -18,14 +18,66 @@ type publicationRequest struct {
 	result    chan error
 }
 
+// PublishStatus sets the own status of an account. Swyx accounts write it
+// through the client API in the background; other accounts publish PIDF.
+// While DND is on or the screen is locked, the status is published as away.
 func (m *Manager) PublishStatus(accountName string, available bool, note string) error {
 	if len(note) > 512 {
 		return errors.New("status note is too long")
 	}
+	a, err := m.getAccount(accountName)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	a.status = ownStatus{set: true, away: !available, note: note}
+	session := a.swyx
+	m.mu.Unlock()
+	if session != nil {
+		select {
+		case session.wake <- struct{}{}:
+		default:
+		}
+		m.notify()
+		return nil
+	}
+	return m.publishOwnStatus(accountName)
+}
+
+func (m *Manager) publishOwnStatus(accountName string) error {
+	m.mu.Lock()
+	a := m.accounts[accountName]
+	if a == nil {
+		m.mu.Unlock()
+		return errors.New("account is not enabled")
+	}
+	available := !a.status.away && !m.screenLocked && !m.dnd
+	note := a.status.note
+	m.mu.Unlock()
 	return m.requestPublication(accountName, publicationRequest{available: available, note: note})
 }
 
 func (m *Manager) UnpublishStatus(accountName string) error {
+	a, err := m.getAccount(accountName)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	session := a.swyx
+	if session != nil {
+		// Swyx keeps a status while registered; reset it instead.
+		a.status = ownStatus{set: true}
+	} else {
+		a.status = ownStatus{}
+	}
+	m.mu.Unlock()
+	if session != nil {
+		select {
+		case session.wake <- struct{}{}:
+		default:
+		}
+		return nil
+	}
 	return m.requestPublication(accountName, publicationRequest{remove: true})
 }
 

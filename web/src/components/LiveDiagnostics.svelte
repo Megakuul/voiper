@@ -24,6 +24,8 @@
         </div>
         {#if account.Error}<p class={[ui.error, "mt-2"]}>{account.Error}</p>{/if}
         {#if account.PresenceError}<p class={[ui.error, "mt-2"]}>Presence: {account.PresenceError}</p>{/if}
+        {#if account.SwyxAPI}<p class={[ui.hint, "mt-2"]}>Swyx client API: {account.SwyxAPI}</p>{/if}
+        {#if account.SwyxAPIError}<p class={[ui.error, "mt-2"]}>Swyx client API: {account.SwyxAPIError}</p>{/if}
         {#if account.Capabilities?.Detail}<p class={[ui.hint, "mt-2"]}>{account.Capabilities.Detail}</p>{/if}
       </div>
     {:else}<p class="m-0 leading-[1.6] text-muted">No enabled accounts. Enable an account in Accounts to connect.</p>{/each}
@@ -38,6 +40,9 @@
         <div><dt class="text-[0.8rem] text-muted">Round trip</dt><dd class="mx-0 mt-1 mb-0">{call.Stats?.RTTMilliseconds > 0 ? `${call.Stats.RTTMilliseconds.toFixed(1)} ms` : "Waiting"}</dd></div>
       </dl>
       {#if call.Error}<p class={ui.error}>{call.Error}</p>{/if}
+      <!-- Media errors and warnings live here; the call view only shows problems that stop audio. -->
+      {#if call.Stats?.LastError}<p class={[ui.error, "mt-2"]}>Media: {call.Stats.LastError}</p>{/if}
+      {#if call.Stats?.MediaWarning}<p class={[ui.hint, "mt-2"]}>{call.Stats.MediaWarning}</p>{/if}
     </div>
   {/each}
   <details class={[ui.details, ui.section]}>

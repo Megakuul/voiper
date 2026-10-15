@@ -44,10 +44,13 @@ func Validate(c Config) error {
 	if c.Port < 0 || c.Port > 65535 {
 		return errors.New("SIP port must be between 0 (automatic) and 65535")
 	}
-	for _, value := range []string{c.Server, c.Username, c.Domain, c.AuthUsername, c.DisplayName, c.OutboundProxy, c.LocalAddress, c.MediaAddress, c.ForwardAlways, c.ForwardBusy, c.ForwardNoAnswer, c.TLSCAFile} {
+	for _, value := range []string{c.Server, c.Username, c.Domain, c.AuthUsername, c.DisplayName, c.OutboundProxy, c.LocalAddress, c.MediaAddress, c.ForwardAlways, c.ForwardBusy, c.ForwardNoAnswer, c.TLSCAFile, c.SwyxUsername} {
 		if len(value) > 2048 || strings.ContainsAny(value, "\r\n\x00") {
 			return errors.New("account field contains invalid characters or is too long")
 		}
+	}
+	if len(c.SwyxPassword) > 4096 {
+		return errors.New("Swyx password is too long")
 	}
 	switch strings.ToLower(c.Transport) {
 	case "", "udp", "tcp", "tls":

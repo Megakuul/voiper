@@ -57,12 +57,30 @@ func TestConflictingPresence(t *testing.T) {
 }
 
 func TestCapabilitiesKeepMessagingIndependent(t *testing.T) {
-	c := Detect("SwyxWare", "auto", "auto")
-	if !c.SwyxDetected || c.Presence != "swyx" || c.Messaging != "sip" {
+	c := Detect("SwyxWare", nil, "auto", "auto")
+	if !c.SwyxDetected || c.Presence != "swyx" || c.Status != "swyx" || c.Messaging != "sip" {
 		t.Fatalf("unexpected capabilities: %+v", c)
 	}
-	c = Detect("SwyxWare", "standard", "swyx")
-	if c.Presence != "standard" || c.Messaging != "unavailable" {
+	c = Detect("SwyxWare", nil, "standard", "disabled")
+	if c.Presence != "standard" || c.Status != "sip" || c.Messaging != "disabled" {
 		t.Fatalf("manual provider selection ignored: %+v", c)
+	}
+}
+
+// The Allow list SwyxWare 14.21 returns for OPTIONS.
+var swyxAllow = []string{"REGISTER", "INVITE", "ACK", "CANCEL", "BYE", "NOTIFY", "REFER", "OPTIONS", "INFO", "SUBSCRIBE", "UPDATE"}
+
+func TestCapabilitiesFollowAllowedMethods(t *testing.T) {
+	c := Detect("Swyx IpPbxSrv/14.21", swyxAllow, "auto", "auto")
+	if c.Status != "swyx" || c.Messaging != "unavailable" {
+		t.Fatalf("Swyx without MESSAGE: %+v", c)
+	}
+	c = Detect("Asterisk", swyxAllow, "auto", "auto")
+	if c.Status != "unavailable" || c.Messaging != "unavailable" {
+		t.Fatalf("server without PUBLISH and MESSAGE: %+v", c)
+	}
+	c = Detect("Asterisk", swyxAllow, "auto", "standard")
+	if c.Messaging != "sip" {
+		t.Fatalf("explicit SIP messaging must override Allow: %+v", c)
 	}
 }

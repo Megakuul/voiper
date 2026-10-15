@@ -208,6 +208,15 @@ func (a *App) SetConfig(cfg *config.Config, name, key string) error {
 			}
 		}
 		stored.Password = ""
+		if stored.SwyxPassword != "" {
+			ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+			err = service.SetSecret(ctx, swyxSecretAccount(path), stored.SwyxPassword)
+			cancel()
+			if err != nil {
+				return err
+			}
+		}
+		stored.SwyxPassword = ""
 	}
 	return config.WriteConfig(&stored, path, key)
 }
@@ -245,6 +254,13 @@ func (a *App) EnableConfig(name, key string) error {
 			return err
 		}
 		cfg.Password = password
+		ctx, cancel = context.WithTimeout(a.ctx, 15*time.Second)
+		swyxPassword, err := service.GetSecret(ctx, swyxSecretAccount(path))
+		cancel()
+		if err != nil && !errors.Is(err, desktop.ErrSecretNotFound) {
+			return err
+		}
+		cfg.SwyxPassword = swyxPassword
 	}
 	return a.phone.Enable(name, *cfg)
 }

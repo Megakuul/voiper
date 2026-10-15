@@ -18,6 +18,10 @@ type Preferences struct {
 	CloseToBackground    bool
 	Autostart            bool
 	MessageRetentionDays int
+	// KeepStatusWhenLocked stops Voiper from showing you as away on a locked screen.
+	KeepStatusWhenLocked bool
+	// ScreenLockCommand overrides lock detection; exit status 0 means locked.
+	ScreenLockCommand string
 }
 type DesktopSettings struct {
 	Preferences  Preferences
@@ -45,6 +49,10 @@ func (a *App) SetPreferences(p Preferences) error {
 	}
 	if len(p.DefaultAccount) > 256 {
 		return errors.New("account name is too long")
+	}
+	p.ScreenLockCommand = strings.TrimSpace(p.ScreenLockCommand)
+	if len(p.ScreenLockCommand) > 1024 || strings.ContainsAny(p.ScreenLockCommand, "\r\n\x00") {
+		return errors.New("screen lock command must be a single line")
 	}
 	root, err := os.UserConfigDir()
 	if err != nil {

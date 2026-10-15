@@ -73,7 +73,7 @@ func (m *Manager) receiveTransfer(ctx context.Context, owner *account, id, targe
 			m.Hold(id, false)
 		}
 	}()
-	replacementID, err := m.dial(name, target)
+	replacementID, err := m.dial(name, target, "")
 	if err != nil {
 		return err
 	}

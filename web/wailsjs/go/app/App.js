@@ -34,6 +34,10 @@ export function ConfigureGlobalShortcuts() {
   return window['go']['app']['App']['ConfigureGlobalShortcuts']();
 }
 
+export function Consult(arg1, arg2) {
+  return window['go']['app']['App']['Consult'](arg1, arg2);
+}
+
 export function Contacts(arg1) {
   return window['go']['app']['App']['Contacts'](arg1);
 }
@@ -304,6 +308,10 @@ export function TestAudio(arg1, arg2) {
 
 export function Transfer(arg1, arg2) {
   return window['go']['app']['App']['Transfer'](arg1, arg2);
+}
+
+export function TrustNewSwyxCertificate(arg1) {
+  return window['go']['app']['App']['TrustNewSwyxCertificate'](arg1);
 }
 
 export function UnpublishStatus(arg1) {
